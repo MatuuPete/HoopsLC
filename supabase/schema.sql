@@ -77,6 +77,16 @@ create policy "player_catalog_admin_update" on player_catalog
 -- Link owned players to a catalog entry
 alter table players add column catalog_player_id uuid references player_catalog(id) on delete set null;
 
+-- An X Player's salary/stats are fixed by the x_player_salary/x_player_stats
+-- constraints above and must never be driven by a catalog import cascade.
+-- The client never links an X Player to a catalog entry, but nothing else
+-- stops a user from setting catalog_player_id on their own X Player row via
+-- PostgREST (the players_owner policy allows updating any column on a row
+-- they own) -- this constraint closes that off at the database level.
+alter table players add constraint x_player_no_catalog_link check (
+  not (is_x_player and catalog_player_id is not null)
+);
+
 -- Bulk import: upserts catalog rows and cascades new price/offense/defense
 -- to every owned player linked to that catalog entry, across all users.
 -- SECURITY DEFINER is required so the cascade can update rows owned by
@@ -89,7 +99,7 @@ create or replace function apply_catalog_import(rows jsonb)
 returns void
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, pg_temp
 as $$
 declare
   import_row jsonb;
@@ -122,10 +132,13 @@ begin
     set current_salary = (import_row->>'price')::numeric,
         offense = (import_row->>'offense')::numeric,
         defense = (import_row->>'defense')::numeric
-    where catalog_player_id = catalog_id;
+    where catalog_player_id = catalog_id
+      and not is_x_player;
   end loop;
 end;
 $$;
+
+revoke execute on function apply_catalog_import(jsonb) from anon;
 
 -- Deferred: run this only after every existing non-X player has been
 -- re-added through the catalog-based Add Player flow (Task 12 of
