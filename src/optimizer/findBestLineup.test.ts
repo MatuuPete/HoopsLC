@@ -48,7 +48,7 @@ describe('findBestLineup', () => {
 
     expect(result.success).toBe(false)
     if (result.success) return
-    expect(result.reason).toBe('missing_position')
+    if (result.reason !== 'missing_position') throw new Error('expected missing_position')
     expect(result.missingPositions).toEqual(['PG'])
   })
 
@@ -65,7 +65,7 @@ describe('findBestLineup', () => {
 
     expect(result.success).toBe(false)
     if (result.success) return
-    expect(result.reason).toBe('cap_too_low')
+    if (result.reason !== 'cap_too_low') throw new Error('expected cap_too_low')
     expect(result.cheapestPossibleBaseSalary).toBe(1000)
   })
 
