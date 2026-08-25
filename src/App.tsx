@@ -3,10 +3,7 @@ import { AuthProvider } from './auth/AuthContext'
 import { ProtectedRoute } from './auth/ProtectedRoute'
 import { LoginPage } from './auth/LoginPage'
 import { AppLayout } from './components/AppLayout'
-
-function PlayersPagePlaceholder() {
-  return <div className="p-6 text-muted">Players page coming soon.</div>
-}
+import { PlayersPage } from './pages/PlayersPage'
 
 function LineupBuilderPagePlaceholder() {
   return <div className="p-6 text-muted">Lineup builder coming soon.</div>
@@ -26,7 +23,7 @@ function App() {
             }
           >
             <Route path="/" element={<Navigate to="/players" replace />} />
-            <Route path="/players" element={<PlayersPagePlaceholder />} />
+            <Route path="/players" element={<PlayersPage />} />
             <Route path="/lineup" element={<LineupBuilderPagePlaceholder />} />
           </Route>
         </Routes>
