@@ -17,3 +17,11 @@ export interface CatalogImportRow {
   offense: number
   defense: number
 }
+
+export type CatalogDiffStatus = 'new' | 'changed' | 'unchanged'
+
+export interface CatalogDiffEntry {
+  row: CatalogImportRow
+  status: CatalogDiffStatus
+  existing: CatalogPlayer | null
+}
