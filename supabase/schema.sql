@@ -13,7 +13,7 @@ create table players (
     not is_x_player or (base_salary = 999 and current_salary = 999)
   ),
   constraint x_player_stats check (
-    not is_x_player or (offense + defense = 500)
+    not is_x_player or (offense + defense = 450)
   )
 );
 

@@ -37,7 +37,7 @@ position's slot like a regular player, but:
 
 - `base_salary` and `current_salary` are both fixed at **999**
   (not user-editable)
-- `offense + defense` must sum to **exactly 500**
+- `offense + defense` must sum to **exactly 450**
 
 Any position's slot may be filled by either a regular player or an
 X Player tagged for that position — whichever the optimizer picks.
@@ -97,7 +97,7 @@ create table players (
     not is_x_player or (base_salary = 999 and current_salary = 999)
   ),
   constraint x_player_stats check (
-    not is_x_player or (offense + defense = 500)
+    not is_x_player or (offense + defense = 450)
   )
 );
 
@@ -119,7 +119,7 @@ create policy "settings_owner" on settings
 Application-level validation mirrors the two check constraints in the
 Players form UI (so the user gets immediate feedback, not just a
 failed insert): toggling "X Player" locks base/current salary to 999
-and requires the two stat fields to sum to exactly 500.
+and requires the two stat fields to sum to exactly 450.
 
 ## Optimizer
 

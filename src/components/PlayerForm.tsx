@@ -4,6 +4,7 @@ import type { Position } from '../optimizer/types'
 
 const POSITIONS: Position[] = ['PG', 'SG', 'SF', 'PF', 'C']
 const MAX_SALARY = 2500
+const X_PLAYER_STAT_TOTAL = 450
 
 interface PlayerFormProps {
   initial?: NewPlayer
@@ -21,7 +22,7 @@ export function PlayerForm({ initial, onSubmit, onCancel }: PlayerFormProps) {
   const [defense, setDefense] = useState(initial?.defense ?? 0)
   const [submitting, setSubmitting] = useState(false)
 
-  const statsValid = !isXPlayer || offense + defense === 500
+  const statsValid = !isXPlayer || offense + defense === X_PLAYER_STAT_TOTAL
   const salaryValid = isXPlayer || (baseSalary <= MAX_SALARY && currentSalary <= MAX_SALARY)
 
   async function handleSubmit(e: FormEvent) {
@@ -124,7 +125,9 @@ export function PlayerForm({ initial, onSubmit, onCancel }: PlayerFormProps) {
       </label>
 
       {isXPlayer && !statsValid && (
-        <p className="text-xs text-red-400">Offense + Defense must equal exactly 500 for an X Player.</p>
+        <p className="text-xs text-red-400">
+          Offense + Defense must equal exactly {X_PLAYER_STAT_TOTAL} for an X Player.
+        </p>
       )}
 
       {!salaryValid && (
