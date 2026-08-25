@@ -36,6 +36,8 @@ export interface LineupCapTooLow {
   success: false
   reason: 'cap_too_low'
   cheapestPossibleBaseSalary: number
+  closestLineup: LineupSlot[]
+  closestTotalCurrentSalary: number
 }
 
 export type LineupResult = LineupSuccess | LineupMissingPosition | LineupCapTooLow

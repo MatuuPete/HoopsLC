@@ -67,6 +67,9 @@ describe('findBestLineup', () => {
     if (result.success) return
     if (result.reason !== 'cap_too_low') throw new Error('expected cap_too_low')
     expect(result.cheapestPossibleBaseSalary).toBe(1000)
+    expect(result.closestLineup).toHaveLength(5)
+    expect(result.closestLineup.find((s) => s.position === 'PG')?.player.id).toBe('pg-1')
+    expect(result.closestTotalCurrentSalary).toBe(1000)
   })
 
   it('selects an X Player when it is the optimal choice for a slot', () => {

@@ -22,17 +22,30 @@ export function findBestLineup(players: Player[], salaryCap: number): LineupResu
     groups[position].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
   }
 
-  const cheapestPossibleCents = POSITIONS.reduce(
-    (sum, position) => sum + Math.min(...groups[position].map((p) => toCents(p.baseSalary))),
+  const closestLineup: LineupSlot[] = POSITIONS.map((position) => {
+    let cheapest = groups[position][0]
+    for (const player of groups[position]) {
+      if (toCents(player.baseSalary) < toCents(cheapest.baseSalary)) cheapest = player
+    }
+    return { position, player: cheapest }
+  })
+  const cheapestPossibleCents = closestLineup.reduce(
+    (sum, slot) => sum + toCents(slot.player.baseSalary),
     0
   )
   const capCents = toCents(salaryCap)
 
   if (cheapestPossibleCents > capCents) {
+    const closestTotalCurrentSalary = closestLineup.reduce(
+      (sum, slot) => sum + slot.player.currentSalary,
+      0
+    )
     return {
       success: false,
       reason: 'cap_too_low',
       cheapestPossibleBaseSalary: cheapestPossibleCents / CENTS,
+      closestLineup,
+      closestTotalCurrentSalary,
     }
   }
 
