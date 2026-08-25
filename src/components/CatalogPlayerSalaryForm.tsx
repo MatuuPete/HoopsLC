@@ -62,6 +62,7 @@ export function CatalogPlayerSalaryForm({
         Base Salary
         <input
           type="number"
+          min={0}
           className="bg-bg border border-border px-2 py-1 text-text"
           value={baseSalary || ''}
           onChange={(e) => setBaseSalary(e.target.value === '' ? 0 : Number(e.target.value))}
