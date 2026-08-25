@@ -11,6 +11,7 @@ interface PlayerRow {
   current_salary: number
   offense: number
   defense: number
+  catalog_player_id: string | null
 }
 
 function fromRow(row: PlayerRow): Player {
@@ -23,6 +24,7 @@ function fromRow(row: PlayerRow): Player {
     currentSalary: row.current_salary,
     offense: row.offense,
     defense: row.defense,
+    catalogPlayerId: row.catalog_player_id,
   }
 }
 
@@ -46,6 +48,7 @@ export async function createPlayer(player: NewPlayer, userId: string): Promise<P
       current_salary: player.currentSalary,
       offense: player.offense,
       defense: player.defense,
+      catalog_player_id: player.catalogPlayerId,
     })
     .select()
     .single()
@@ -64,6 +67,7 @@ export async function updatePlayer(id: string, player: NewPlayer): Promise<Playe
       current_salary: player.currentSalary,
       offense: player.offense,
       defense: player.defense,
+      catalog_player_id: player.catalogPlayerId,
     })
     .eq('id', id)
     .select()

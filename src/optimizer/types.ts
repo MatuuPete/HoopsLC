@@ -11,6 +11,7 @@ export interface Player {
   currentSalary: number
   offense: number
   defense: number
+  catalogPlayerId: string | null
 }
 
 export interface LineupSlot {

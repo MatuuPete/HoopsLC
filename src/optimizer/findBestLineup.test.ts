@@ -10,6 +10,7 @@ function makePlayer(overrides: Partial<Player> & Pick<Player, 'id' | 'position'>
     currentSalary: 100,
     offense: 50,
     defense: 50,
+    catalogPlayerId: null,
     ...overrides,
   }
 }

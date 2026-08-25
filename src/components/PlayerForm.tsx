@@ -40,6 +40,7 @@ export function PlayerForm({ initial, onSubmit, onCancel }: PlayerFormProps) {
         currentSalary: isXPlayer ? 999 : currentSalary,
         offense,
         defense,
+        catalogPlayerId: null,
       })
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Failed to save player')
