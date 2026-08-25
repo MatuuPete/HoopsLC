@@ -3,6 +3,7 @@ import type { NewPlayer } from '../data/playersApi'
 import type { Position } from '../optimizer/types'
 
 const POSITIONS: Position[] = ['PG', 'SG', 'SF', 'PF', 'C']
+const MAX_SALARY = 2500
 
 interface PlayerFormProps {
   initial?: NewPlayer
@@ -21,10 +22,11 @@ export function PlayerForm({ initial, onSubmit, onCancel }: PlayerFormProps) {
   const [submitting, setSubmitting] = useState(false)
 
   const statsValid = !isXPlayer || offense + defense === 500
+  const salaryValid = isXPlayer || (baseSalary <= MAX_SALARY && currentSalary <= MAX_SALARY)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!statsValid) return
+    if (!statsValid || !salaryValid) return
     setSubmitting(true)
     try {
       await onSubmit({
@@ -81,6 +83,7 @@ export function PlayerForm({ initial, onSubmit, onCancel }: PlayerFormProps) {
           value={isXPlayer ? 999 : baseSalary || ''}
           onChange={(e) => setBaseSalary(e.target.value === '' ? 0 : Number(e.target.value))}
           disabled={isXPlayer}
+          max={MAX_SALARY}
           required
         />
       </label>
@@ -93,6 +96,7 @@ export function PlayerForm({ initial, onSubmit, onCancel }: PlayerFormProps) {
           value={isXPlayer ? 999 : currentSalary || ''}
           onChange={(e) => setCurrentSalary(e.target.value === '' ? 0 : Number(e.target.value))}
           disabled={isXPlayer}
+          max={MAX_SALARY}
           required
         />
       </label>
@@ -123,10 +127,14 @@ export function PlayerForm({ initial, onSubmit, onCancel }: PlayerFormProps) {
         <p className="text-xs text-red-400">Offense + Defense must equal exactly 500 for an X Player.</p>
       )}
 
+      {!salaryValid && (
+        <p className="text-xs text-red-400">Base Salary and Current Salary must be {MAX_SALARY} or less.</p>
+      )}
+
       <div className="flex gap-2">
         <button
           type="submit"
-          disabled={submitting || !statsValid}
+          disabled={submitting || !statsValid || !salaryValid}
           className="bg-text text-bg px-4 py-2 uppercase tracking-widest text-xs font-bold disabled:opacity-50"
         >
           Save
