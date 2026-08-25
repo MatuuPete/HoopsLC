@@ -21,6 +21,7 @@ export function PlayerForm({ initial, onSubmit, onCancel }: PlayerFormProps) {
   const [offense, setOffense] = useState(initial?.offense ?? 0)
   const [defense, setDefense] = useState(initial?.defense ?? 0)
   const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   const statsValid = !isXPlayer || offense + defense === X_PLAYER_STAT_TOTAL
   const salaryValid = isXPlayer || (baseSalary <= MAX_SALARY && currentSalary <= MAX_SALARY)
@@ -29,6 +30,7 @@ export function PlayerForm({ initial, onSubmit, onCancel }: PlayerFormProps) {
     e.preventDefault()
     if (!statsValid || !salaryValid) return
     setSubmitting(true)
+    setSubmitError(null)
     try {
       await onSubmit({
         name,
@@ -39,6 +41,8 @@ export function PlayerForm({ initial, onSubmit, onCancel }: PlayerFormProps) {
         offense,
         defense,
       })
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Failed to save player')
     } finally {
       setSubmitting(false)
     }
@@ -133,6 +137,8 @@ export function PlayerForm({ initial, onSubmit, onCancel }: PlayerFormProps) {
       {!salaryValid && (
         <p className="text-xs text-red-400">Base Salary and Current Salary must be {MAX_SALARY} or less.</p>
       )}
+
+      {submitError && <p className="text-xs text-red-400">{submitError}</p>}
 
       <div className="flex gap-2">
         <button
