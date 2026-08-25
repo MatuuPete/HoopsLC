@@ -17,6 +17,15 @@ lineup (PG/SG/SF/PF/C) from the players you own, maximizing total power
    with row-level security enabled.
 3. Go to Project Settings → API. Copy the "Project URL" and the
    "anon public" API key.
+4. In the SQL Editor, run:
+
+   ```sql
+   insert into profiles (user_id, is_admin)
+   values ('<your-user-uuid-from-authentication-users>', true);
+   ```
+
+   This makes your account an admin, which is required to import player
+   catalog data on `/admin/catalog`.
 
 ## 2. Configure environment variables
 
