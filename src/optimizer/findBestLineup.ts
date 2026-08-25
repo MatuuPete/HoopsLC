@@ -6,50 +6,28 @@ function toCents(amount: number): number {
   return Math.round(amount * CENTS)
 }
 
-export function findBestLineup(players: Player[], salaryCap: number): LineupResult {
-  const groups: Record<Position, Player[]> = { PG: [], SG: [], SF: [], PF: [], C: [] }
-  for (const player of players) {
-    groups[player.position].push(player)
-  }
+type KnapsackResult =
+  | { feasible: true; slots: LineupSlot[]; totalCurrentSalary: number; totalBaseSalary: number }
+  | { feasible: false; cheapestCents: number; cheapestSlots: LineupSlot[]; cheapestCurrentSalary: number }
 
-  const missingPositions = POSITIONS.filter((position) => groups[position].length === 0)
-  if (missingPositions.length > 0) {
-    return { success: false, reason: 'missing_position', missingPositions }
-  }
-
-  // Sort each group by id ascending so ties resolve to the stable, lowest-id candidate.
-  for (const position of POSITIONS) {
-    groups[position].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
-  }
-
-  const closestLineup: LineupSlot[] = POSITIONS.map((position) => {
+/** Solves the one-player-per-position knapsack for a fixed set of candidate groups (already non-empty and id-sorted per position). */
+function solveKnapsack(groups: Record<Position, Player[]>, capCents: number): KnapsackResult {
+  const cheapestSlots: LineupSlot[] = POSITIONS.map((position) => {
     let cheapest = groups[position][0]
     for (const player of groups[position]) {
       if (toCents(player.baseSalary) < toCents(cheapest.baseSalary)) cheapest = player
     }
     return { position, player: cheapest }
   })
-  const cheapestPossibleCents = closestLineup.reduce(
-    (sum, slot) => sum + toCents(slot.player.baseSalary),
-    0
-  )
-  const capCents = toCents(salaryCap)
+  const cheapestCents = cheapestSlots.reduce((sum, slot) => sum + toCents(slot.player.baseSalary), 0)
 
-  if (cheapestPossibleCents > capCents) {
-    const closestTotalCurrentSalary = closestLineup.reduce(
-      (sum, slot) => sum + slot.player.currentSalary,
-      0
-    )
-    return {
-      success: false,
-      reason: 'cap_too_low',
-      cheapestPossibleBaseSalary: cheapestPossibleCents / CENTS,
-      closestLineup,
-      closestTotalCurrentSalary,
-    }
+  if (cheapestCents > capCents) {
+    const cheapestCurrentSalary = cheapestSlots.reduce((sum, slot) => sum + slot.player.currentSalary, 0)
+    return { feasible: false, cheapestCents, cheapestSlots, cheapestCurrentSalary }
   }
 
   // dp[c] = best { valueCents, costCents } achievable with total cost <= c using groups processed so far.
+  // valueCents === -1 marks a budget that is not achievable yet.
   type Cell = { valueCents: number; costCents: number }
   let dp: Cell[] = new Array(capCents + 1)
   for (let c = 0; c <= capCents; c++) dp[c] = { valueCents: 0, costCents: 0 }
@@ -68,6 +46,8 @@ export function findBestLineup(players: Player[], salaryCap: number): LineupResu
         const cost = toCents(player.baseSalary)
         if (cost > c) continue
         const prev = dp[c - cost]
+        if (prev.valueCents < 0) continue
+
         const candidateValue = prev.valueCents + toCents(player.currentSalary)
         const candidateCost = prev.costCents + cost
 
@@ -102,14 +82,101 @@ export function findBestLineup(players: Player[], salaryCap: number): LineupResu
     budget -= toCents(player.baseSalary)
   }
 
-  const totalCurrentSalary = finalCell.valueCents / CENTS
-  const totalBaseSalary = finalCell.costCents / CENTS
-
   return {
-    success: true,
+    feasible: true,
     slots,
-    totalBaseSalary,
-    totalCurrentSalary,
-    remainingCap: salaryCap - totalBaseSalary,
+    totalCurrentSalary: finalCell.valueCents / CENTS,
+    totalBaseSalary: finalCell.costCents / CENTS,
+  }
+}
+
+function sortedById(players: Player[]): Player[] {
+  return [...players].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+}
+
+export function findBestLineup(players: Player[], salaryCap: number): LineupResult {
+  const groups: Record<Position, Player[]> = { PG: [], SG: [], SF: [], PF: [], C: [] }
+  for (const player of players) {
+    groups[player.position].push(player)
+  }
+
+  const missingPositions = POSITIONS.filter((position) => groups[position].length === 0)
+  if (missingPositions.length > 0) {
+    return { success: false, reason: 'missing_position', missingPositions }
+  }
+
+  const regularGroups: Record<Position, Player[]> = { PG: [], SG: [], SF: [], PF: [], C: [] }
+  const xGroups: Record<Position, Player[]> = { PG: [], SG: [], SF: [], PF: [], C: [] }
+  for (const position of POSITIONS) {
+    regularGroups[position] = sortedById(groups[position].filter((p) => !p.isXPlayer))
+    xGroups[position] = sortedById(groups[position].filter((p) => p.isXPlayer))
+  }
+
+  const positionsWithoutXPlayer = POSITIONS.filter((p) => xGroups[p].length === 0)
+  const positionsWithoutRegularPlayer = POSITIONS.filter((p) => regularGroups[p].length === 0)
+
+  // A position can host the mandatory X slot only if it has an X candidate and every
+  // other position has a regular candidate to fall back on.
+  const validXPositions = POSITIONS.filter((xPos) => {
+    if (xGroups[xPos].length === 0) return false
+    return POSITIONS.every((other) => other === xPos || regularGroups[other].length > 0)
+  })
+
+  if (validXPositions.length === 0) {
+    return {
+      success: false,
+      reason: 'no_valid_x_slot',
+      positionsWithoutXPlayer,
+      positionsWithoutRegularPlayer,
+    }
+  }
+
+  const capCents = toCents(salaryCap)
+
+  let bestFeasible: { xPos: Position; result: Extract<KnapsackResult, { feasible: true }> } | null = null
+  let bestInfeasible: { xPos: Position; result: Extract<KnapsackResult, { feasible: false }> } | null = null
+
+  for (const xPos of validXPositions) {
+    const groupsForXPos: Record<Position, Player[]> = { PG: [], SG: [], SF: [], PF: [], C: [] }
+    for (const position of POSITIONS) {
+      groupsForXPos[position] = position === xPos ? xGroups[position] : regularGroups[position]
+    }
+
+    const result = solveKnapsack(groupsForXPos, capCents)
+
+    if (result.feasible) {
+      if (
+        !bestFeasible ||
+        result.totalCurrentSalary > bestFeasible.result.totalCurrentSalary ||
+        (result.totalCurrentSalary === bestFeasible.result.totalCurrentSalary &&
+          result.totalBaseSalary < bestFeasible.result.totalBaseSalary)
+      ) {
+        bestFeasible = { xPos, result }
+      }
+    } else if (!bestInfeasible || result.cheapestCents < bestInfeasible.result.cheapestCents) {
+      bestInfeasible = { xPos, result }
+    }
+  }
+
+  if (bestFeasible) {
+    const { result } = bestFeasible
+    return {
+      success: true,
+      slots: result.slots,
+      totalBaseSalary: result.totalBaseSalary,
+      totalCurrentSalary: result.totalCurrentSalary,
+      remainingCap: salaryCap - result.totalBaseSalary,
+    }
+  }
+
+  // bestInfeasible is guaranteed set here: validXPositions is non-empty, so every
+  // iteration produced either a feasible or infeasible result, and none were feasible.
+  const { result } = bestInfeasible!
+  return {
+    success: false,
+    reason: 'cap_too_low',
+    cheapestPossibleBaseSalary: result.cheapestCents / CENTS,
+    closestLineup: result.cheapestSlots,
+    closestTotalCurrentSalary: result.cheapestCurrentSalary,
   }
 }

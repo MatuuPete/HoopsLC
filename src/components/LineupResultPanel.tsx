@@ -11,6 +11,16 @@ export function LineupResultPanel({ result }: { result: LineupResult | null }) {
     )
   }
 
+  if (!result.success && result.reason === 'no_valid_x_slot') {
+    return (
+      <div className="border border-border bg-panel p-4 text-sm text-red-400">
+        No valid lineup: every lineup needs exactly one X Player. Positions with no X Player:{' '}
+        {result.positionsWithoutXPlayer.join(', ') || 'none'}. Positions with no regular player:{' '}
+        {result.positionsWithoutRegularPlayer.join(', ') || 'none'}.
+      </div>
+    )
+  }
+
   if (!result.success && result.reason === 'cap_too_low') {
     return (
       <div className="border border-border bg-panel p-4 flex flex-col gap-3">
@@ -20,7 +30,10 @@ export function LineupResultPanel({ result }: { result: LineupResult | null }) {
         </p>
         {result.closestLineup.map((slot) => (
           <div key={slot.position} className="flex justify-between text-sm">
-            <span className="text-muted uppercase tracking-widest">{slot.position}</span>
+            <span className="text-muted uppercase tracking-widest">
+              {slot.position}
+              {slot.player.isXPlayer ? ' (X)' : ''}
+            </span>
             <span>{slot.player.name}</span>
             <span>{slot.player.currentSalary}</span>
           </div>
@@ -43,7 +56,10 @@ export function LineupResultPanel({ result }: { result: LineupResult | null }) {
     <div className="border border-border bg-panel p-4 flex flex-col gap-3">
       {result.slots.map((slot) => (
         <div key={slot.position} className="flex justify-between text-sm">
-          <span className="text-muted uppercase tracking-widest">{slot.position}</span>
+          <span className="text-muted uppercase tracking-widest">
+            {slot.position}
+            {slot.player.isXPlayer ? ' (X)' : ''}
+          </span>
           <span>{slot.player.name}</span>
           <span>{slot.player.currentSalary}</span>
         </div>

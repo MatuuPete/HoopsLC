@@ -40,4 +40,15 @@ export interface LineupCapTooLow {
   closestTotalCurrentSalary: number
 }
 
-export type LineupResult = LineupSuccess | LineupMissingPosition | LineupCapTooLow
+export interface LineupNoValidXSlot {
+  success: false
+  reason: 'no_valid_x_slot'
+  positionsWithoutXPlayer: Position[]
+  positionsWithoutRegularPlayer: Position[]
+}
+
+export type LineupResult =
+  | LineupSuccess
+  | LineupMissingPosition
+  | LineupCapTooLow
+  | LineupNoValidXSlot
