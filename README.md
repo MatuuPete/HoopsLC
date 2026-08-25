@@ -61,3 +61,19 @@ Runs the Vitest suite (currently covers the lineup optimizer core).
 - `src/pages/` — top-level pages (Players, Lineup Builder).
 - `src/components/` — shared UI components (nav, layout, forms, tables).
 - `supabase/schema.sql` — database schema and RLS policies.
+
+## Manual End-to-End Verification
+
+After setup, verify the full flow works:
+
+1. Sign up a new account at `/login`.
+2. On `/players`, add at least one player for each of PG, SG, SF, PF, C
+   (mix in one X Player to confirm the 999/999 salary lock and the
+   500 offense+defense validation).
+3. On `/lineup`, set a salary cap, click "Calculate Best Lineup", and
+   confirm the result panel shows one player per position with correct
+   totals, and the bottom stat strip reflects your player count and
+   total power.
+4. Edit and delete a player on `/players`, then recalculate the lineup
+   on `/lineup` to confirm it reflects the change.
+5. Sign out and back in to confirm your data persists.
