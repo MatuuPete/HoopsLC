@@ -78,8 +78,8 @@ export function PlayerForm({ initial, onSubmit, onCancel }: PlayerFormProps) {
         <input
           type="number"
           className="bg-bg border border-border px-2 py-1 text-text disabled:opacity-50"
-          value={isXPlayer ? 999 : baseSalary}
-          onChange={(e) => setBaseSalary(Number(e.target.value))}
+          value={isXPlayer ? 999 : baseSalary || ''}
+          onChange={(e) => setBaseSalary(e.target.value === '' ? 0 : Number(e.target.value))}
           disabled={isXPlayer}
           required
         />
@@ -90,8 +90,8 @@ export function PlayerForm({ initial, onSubmit, onCancel }: PlayerFormProps) {
         <input
           type="number"
           className="bg-bg border border-border px-2 py-1 text-text disabled:opacity-50"
-          value={isXPlayer ? 999 : currentSalary}
-          onChange={(e) => setCurrentSalary(Number(e.target.value))}
+          value={isXPlayer ? 999 : currentSalary || ''}
+          onChange={(e) => setCurrentSalary(e.target.value === '' ? 0 : Number(e.target.value))}
           disabled={isXPlayer}
           required
         />
@@ -102,8 +102,8 @@ export function PlayerForm({ initial, onSubmit, onCancel }: PlayerFormProps) {
         <input
           type="number"
           className="bg-bg border border-border px-2 py-1 text-text"
-          value={offense}
-          onChange={(e) => setOffense(Number(e.target.value))}
+          value={offense || ''}
+          onChange={(e) => setOffense(e.target.value === '' ? 0 : Number(e.target.value))}
           required
         />
       </label>
@@ -113,8 +113,8 @@ export function PlayerForm({ initial, onSubmit, onCancel }: PlayerFormProps) {
         <input
           type="number"
           className="bg-bg border border-border px-2 py-1 text-text"
-          value={defense}
-          onChange={(e) => setDefense(Number(e.target.value))}
+          value={defense || ''}
+          onChange={(e) => setDefense(e.target.value === '' ? 0 : Number(e.target.value))}
           required
         />
       </label>
