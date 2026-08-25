@@ -52,7 +52,7 @@ create table player_catalog (
   defense numeric not null default 0,
   updated_at timestamptz not null default now(),
   constraint player_catalog_positions_valid check (
-    array_length(positions, 1) > 0
+    coalesce(array_length(positions, 1), 0) > 0
     and positions <@ array['PG','SG','SF','PF','C']
   )
 );
