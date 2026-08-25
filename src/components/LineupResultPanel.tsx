@@ -1,4 +1,12 @@
-import type { LineupResult } from '../optimizer/types'
+import type { LineupResult, LineupSlot } from '../optimizer/types'
+
+function sumOffense(slots: LineupSlot[]): number {
+  return slots.reduce((sum, slot) => sum + slot.player.offense, 0)
+}
+
+function sumDefense(slots: LineupSlot[]): number {
+  return slots.reduce((sum, slot) => sum + slot.player.defense, 0)
+}
 
 export function LineupResultPanel({ result }: { result: LineupResult | null }) {
   if (!result) return null
@@ -46,6 +54,14 @@ export function LineupResultPanel({ result }: { result: LineupResult | null }) {
           <span>Closest Total Power</span>
           <span>{result.closestTotalCurrentSalary}</span>
         </div>
+        <div className="flex justify-between text-xs uppercase tracking-widest text-muted">
+          <span>Closest Total Offense</span>
+          <span>{sumOffense(result.closestLineup)}</span>
+        </div>
+        <div className="flex justify-between text-xs uppercase tracking-widest text-muted">
+          <span>Closest Total Defense</span>
+          <span>{sumDefense(result.closestLineup)}</span>
+        </div>
       </div>
     )
   }
@@ -75,6 +91,14 @@ export function LineupResultPanel({ result }: { result: LineupResult | null }) {
       <div className="flex justify-between text-xs uppercase tracking-widest text-muted">
         <span>Remaining Cap</span>
         <span>{result.remainingCap}</span>
+      </div>
+      <div className="flex justify-between text-xs uppercase tracking-widest text-muted">
+        <span>Total Offense</span>
+        <span>{sumOffense(result.slots)}</span>
+      </div>
+      <div className="flex justify-between text-xs uppercase tracking-widest text-muted">
+        <span>Total Defense</span>
+        <span>{sumDefense(result.slots)}</span>
       </div>
     </div>
   )
