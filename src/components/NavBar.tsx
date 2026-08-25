@@ -1,13 +1,14 @@
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 
-const links = [
+const baseLinks = [
   { to: '/players', label: 'Players' },
   { to: '/lineup', label: 'Lineup Builder' },
 ]
 
 export function NavBar() {
-  const { signOut } = useAuth()
+  const { signOut, isAdmin } = useAuth()
+  const links = isAdmin ? [...baseLinks, { to: '/admin/catalog', label: 'Catalog Admin' }] : baseLinks
 
   return (
     <nav className="flex items-center justify-between border-b border-border px-6 py-4">

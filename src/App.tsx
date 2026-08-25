@@ -1,10 +1,12 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
 import { ProtectedRoute } from './auth/ProtectedRoute'
+import { AdminRoute } from './auth/AdminRoute'
 import { LoginPage } from './auth/LoginPage'
 import { AppLayout } from './components/AppLayout'
 import { PlayersPage } from './pages/PlayersPage'
 import { LineupBuilderPage } from './pages/LineupBuilderPage'
+import { AdminCatalogPage } from './pages/AdminCatalogPage'
 
 function App() {
   return (
@@ -22,6 +24,14 @@ function App() {
             <Route path="/" element={<Navigate to="/players" replace />} />
             <Route path="/players" element={<PlayersPage />} />
             <Route path="/lineup" element={<LineupBuilderPage />} />
+            <Route
+              path="/admin/catalog"
+              element={
+                <AdminRoute>
+                  <AdminCatalogPage />
+                </AdminRoute>
+              }
+            />
           </Route>
         </Routes>
       </BrowserRouter>
