@@ -15,6 +15,7 @@ export function AdminCatalogPage() {
   function handlePreview() {
     setParseError(null)
     setDiff(null)
+    setImportError(null)
     try {
       const rows = parseCatalogImport(raw)
       setDiff(diffCatalogImport(rows, catalog))
