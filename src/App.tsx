@@ -4,10 +4,7 @@ import { ProtectedRoute } from './auth/ProtectedRoute'
 import { LoginPage } from './auth/LoginPage'
 import { AppLayout } from './components/AppLayout'
 import { PlayersPage } from './pages/PlayersPage'
-
-function LineupBuilderPagePlaceholder() {
-  return <div className="p-6 text-muted">Lineup builder coming soon.</div>
-}
+import { LineupBuilderPage } from './pages/LineupBuilderPage'
 
 function App() {
   return (
@@ -24,7 +21,7 @@ function App() {
           >
             <Route path="/" element={<Navigate to="/players" replace />} />
             <Route path="/players" element={<PlayersPage />} />
-            <Route path="/lineup" element={<LineupBuilderPagePlaceholder />} />
+            <Route path="/lineup" element={<LineupBuilderPage />} />
           </Route>
         </Routes>
       </BrowserRouter>
