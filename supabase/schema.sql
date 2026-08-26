@@ -155,3 +155,10 @@ alter table players add constraint players_positions_valid check (
   array_length(positions, 1) > 0
   and positions <@ array['PG','SG','SF','PF','C']
 );
+
+-- Lineup preferences: required players and objective mode
+alter table settings add column required_player_ids uuid[] not null default '{}';
+alter table settings add column objective_mode text not null default 'power'
+  check (objective_mode in ('power', 'stats'));
+alter table settings add column offense_weight numeric not null default 0.5
+  check (offense_weight >= 0 and offense_weight <= 1);
