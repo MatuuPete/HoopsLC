@@ -142,11 +142,11 @@ attempted (not a minimal isolated subset) — pinpointing exactly which
 diagnostic problem not needed here; the UI message names all of them
 and lets you work out which to unpick.
 
-`LineupSuccess` and `LineupCapTooLow` keep `totalCurrentSalary` (still
-useful to show regardless of mode) and gain `totalOffense` and
-`totalDefense` on the chosen 5, so the result panel can show the
-metric that actually drove the choice in Stats mode without the UI
-needing to recompute it from `slots`.
+`LineupSuccess` and `LineupCapTooLow` are otherwise unchanged —
+`LineupResultPanel` already derives total offense/defense from
+`slots`/`closestLineup` client-side (`sumOffense`/`sumDefense`
+helpers), so no new fields are needed there for Stats mode to display
+correctly.
 
 ## Settings & Data Layer
 
@@ -166,11 +166,12 @@ Two new sections above "Calculate Best Lineup":
   Offense, defaulting to the persisted `offenseWeight`, 50% = equal
   weight). Both persist on change.
 
-The result panel gains a line showing total offense/defense for the
-chosen lineup (using the new `totalOffense`/`totalDefense` fields),
-and a new failure message for `required_players_conflict` naming the
-conflicting players by name (looked up from the roster, since the
-result only carries ids).
+The result panel gains a new failure message for
+`required_players_conflict` naming the conflicting players by name
+(looked up from the roster, since the result only carries ids); it
+already shows total offense/defense for any successful or
+closest-lineup result today, so Stats mode needs no display changes
+there.
 
 ## Testing Strategy
 
