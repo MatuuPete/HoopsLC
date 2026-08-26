@@ -30,7 +30,7 @@ export function LineupResultPanel({ result, players }: LineupResultPanelProps) {
       .join(', ')
     return (
       <div className="border border-border bg-panel p-4 text-sm text-red-400">
-        Required players can't all fit in one lineup: {names}. Try unchecking one.
+        Preferred players can't all fit in one lineup: {names}. Try unchecking one.
       </div>
     )
   }

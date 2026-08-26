@@ -19,6 +19,7 @@ export function LineupBuilderPage() {
   } = useSettings()
   const [capInput, setCapInput] = useState(salaryCap)
   const [result, setResult] = useState<LineupResult | null>(null)
+  const [preferredSearch, setPreferredSearch] = useState('')
 
   useEffect(() => {
     setCapInput(salaryCap)
@@ -40,6 +41,10 @@ export function LineupBuilderPage() {
     updateRequiredPlayerIds(next)
   }
 
+  const filteredPlayers = players.filter((p) =>
+    p.name.toLowerCase().includes(preferredSearch.toLowerCase()),
+  )
+
   return (
     <div className="flex flex-col gap-4 p-6 max-w-md">
       <h1 className="text-sm uppercase tracking-widest text-muted">Lineup Builder</h1>
@@ -55,10 +60,19 @@ export function LineupBuilderPage() {
       </label>
 
       <div className="flex flex-col gap-1 text-xs uppercase tracking-widest text-muted">
-        Required Players
+        Preferred Players
+        <input
+          className="bg-bg border border-border px-2 py-1 text-text normal-case tracking-normal text-sm"
+          placeholder="Search player..."
+          value={preferredSearch}
+          onChange={(e) => setPreferredSearch(e.target.value)}
+        />
         <div className="border border-border bg-panel p-2 flex flex-col gap-1 max-h-48 overflow-y-auto">
           {players.length === 0 && <span className="text-muted normal-case">No owned players yet.</span>}
-          {players.map((p) => (
+          {players.length > 0 && filteredPlayers.length === 0 && (
+            <span className="text-muted normal-case">No players match "{preferredSearch}".</span>
+          )}
+          {filteredPlayers.map((p) => (
             <label key={p.id} className="flex items-center gap-2 normal-case tracking-normal text-text text-sm">
               <input
                 type="checkbox"
