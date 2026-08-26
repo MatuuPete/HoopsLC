@@ -5,14 +5,14 @@ import { PlayerForm } from '../components/PlayerForm'
 import { CatalogPlayerPicker } from '../components/CatalogPlayerPicker'
 import { CatalogPlayerSalaryForm } from '../components/CatalogPlayerSalaryForm'
 import { PlayerTable } from '../components/PlayerTable'
-import type { Player, Position } from '../optimizer/types'
+import type { Player } from '../optimizer/types'
 import type { CatalogPlayer } from '../catalog/types'
 import type { NewPlayer } from '../data/playersApi'
 
 type Mode =
   | { kind: 'closed' }
   | { kind: 'pick-catalog' }
-  | { kind: 'add-catalog'; player: CatalogPlayer; position: Position }
+  | { kind: 'add-catalog'; player: CatalogPlayer }
   | { kind: 'edit-catalog'; player: Player }
   | { kind: 'x-form'; editing?: Player }
 
@@ -30,10 +30,10 @@ export function PlayersPage() {
     setMode({ kind: 'closed' })
   }
 
-  async function handleAddCatalogSubmit(player: CatalogPlayer, position: Position, baseSalary: number) {
+  async function handleAddCatalogSubmit(player: CatalogPlayer, baseSalary: number) {
     await addPlayer({
       name: player.name,
-      position,
+      positions: player.positions,
       isXPlayer: false,
       baseSalary,
       currentSalary: player.price,
@@ -47,7 +47,7 @@ export function PlayersPage() {
   async function handleEditCatalogSubmit(existing: Player, baseSalary: number) {
     await editPlayer(existing.id, {
       name: existing.name,
-      position: existing.position,
+      positions: existing.positions,
       isXPlayer: false,
       baseSalary,
       currentSalary: existing.currentSalary,
@@ -84,7 +84,7 @@ export function PlayersPage() {
       {mode.kind === 'pick-catalog' && (
         <CatalogPlayerPicker
           catalog={catalog}
-          onSelect={(player, position) => setMode({ kind: 'add-catalog', player, position })}
+          onSelect={(player) => setMode({ kind: 'add-catalog', player })}
           onCancel={() => setMode({ kind: 'closed' })}
         />
       )}
@@ -92,11 +92,11 @@ export function PlayersPage() {
       {mode.kind === 'add-catalog' && (
         <CatalogPlayerSalaryForm
           name={mode.player.name}
-          position={mode.position}
+          positions={mode.player.positions}
           price={mode.player.price}
           offense={mode.player.offense}
           defense={mode.player.defense}
-          onSubmit={(baseSalary) => handleAddCatalogSubmit(mode.player, mode.position, baseSalary)}
+          onSubmit={(baseSalary) => handleAddCatalogSubmit(mode.player, baseSalary)}
           onCancel={() => setMode({ kind: 'closed' })}
         />
       )}
@@ -104,7 +104,7 @@ export function PlayersPage() {
       {mode.kind === 'edit-catalog' && (
         <CatalogPlayerSalaryForm
           name={mode.player.name}
-          position={mode.player.position}
+          positions={mode.player.positions}
           price={mode.player.currentSalary}
           offense={mode.player.offense}
           defense={mode.player.defense}

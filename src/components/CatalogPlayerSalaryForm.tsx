@@ -3,7 +3,7 @@ import type { Position } from '../optimizer/types'
 
 interface CatalogPlayerSalaryFormProps {
   name: string
-  position: Position
+  positions: Position[]
   price: number
   offense: number
   defense: number
@@ -14,7 +14,7 @@ interface CatalogPlayerSalaryFormProps {
 
 export function CatalogPlayerSalaryForm({
   name,
-  position,
+  positions,
   price,
   offense,
   defense,
@@ -43,7 +43,7 @@ export function CatalogPlayerSalaryForm({
     <form onSubmit={handleSubmit} className="border border-border bg-panel p-4 flex flex-col gap-3">
       <div className="flex justify-between text-sm">
         <span>{name}</span>
-        <span className="text-muted uppercase tracking-widest">{position}</span>
+        <span className="text-muted uppercase tracking-widest">{positions.join('/')}</span>
       </div>
       <div className="flex justify-between text-xs uppercase tracking-widest text-muted">
         <span>Price</span>

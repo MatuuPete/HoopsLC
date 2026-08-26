@@ -14,23 +14,30 @@ interface PlayerFormProps {
 
 export function PlayerForm({ initial, onSubmit, onCancel }: PlayerFormProps) {
   const [name, setName] = useState(initial?.name ?? '')
-  const [position, setPosition] = useState<Position>(initial?.position ?? 'PG')
+  const [positions, setPositions] = useState<Position[]>(initial?.positions ?? ['PG'])
   const [offense, setOffense] = useState(initial?.offense ?? 0)
   const [defense, setDefense] = useState(initial?.defense ?? 0)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
   const statsValid = offense + defense === X_PLAYER_STAT_TOTAL
+  const positionsValid = positions.length > 0
+
+  function togglePosition(position: Position) {
+    setPositions((current) =>
+      current.includes(position) ? current.filter((p) => p !== position) : [...current, position],
+    )
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!statsValid) return
+    if (!statsValid || !positionsValid) return
     setSubmitting(true)
     setSubmitError(null)
     try {
       await onSubmit({
         name,
-        position,
+        positions,
         isXPlayer: true,
         baseSalary: X_PLAYER_SALARY,
         currentSalary: X_PLAYER_SALARY,
@@ -57,20 +64,28 @@ export function PlayerForm({ initial, onSubmit, onCancel }: PlayerFormProps) {
         />
       </label>
 
-      <label className="flex flex-col gap-1 text-xs uppercase tracking-widest text-muted">
-        Position
-        <select
-          className="bg-bg border border-border px-2 py-1 text-text"
-          value={position}
-          onChange={(e) => setPosition(e.target.value as Position)}
-        >
+      <div className="flex flex-col gap-1 text-xs uppercase tracking-widest text-muted">
+        Positions
+        <div className="flex gap-2">
           {POSITIONS.map((p) => (
-            <option key={p} value={p}>
+            <button
+              key={p}
+              type="button"
+              onClick={() => togglePosition(p)}
+              className={
+                positions.includes(p)
+                  ? 'border border-accent text-accent px-3 py-1'
+                  : 'border border-border text-muted px-3 py-1'
+              }
+            >
               {p}
-            </option>
+            </button>
           ))}
-        </select>
-      </label>
+        </div>
+        {!positionsValid && (
+          <p className="text-xs text-red-400 normal-case tracking-normal">Select at least one position.</p>
+        )}
+      </div>
 
       <label className="flex flex-col gap-1 text-xs uppercase tracking-widest text-muted">
         Offense
@@ -105,7 +120,7 @@ export function PlayerForm({ initial, onSubmit, onCancel }: PlayerFormProps) {
       <div className="flex gap-2">
         <button
           type="submit"
-          disabled={submitting || !statsValid}
+          disabled={submitting || !statsValid || !positionsValid}
           className="bg-text text-bg px-4 py-2 uppercase tracking-widest text-xs font-bold disabled:opacity-50"
         >
           Save

@@ -25,7 +25,7 @@ export function PlayerTable({ players, onEdit, onDelete }: PlayerTableProps) {
         {players.map((p) => (
           <tr key={p.id} className="border-b border-border">
             <td className="py-2">{p.name}</td>
-            <td>{p.position}</td>
+            <td>{p.positions.join('/')}</td>
             <td>{p.isXPlayer ? 'X' : ''}</td>
             <td>{p.baseSalary}</td>
             <td>{p.currentSalary}</td>

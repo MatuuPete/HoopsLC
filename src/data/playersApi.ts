@@ -5,7 +5,7 @@ interface PlayerRow {
   id: string
   user_id: string
   name: string
-  position: Player['position']
+  positions: Player['positions']
   is_x_player: boolean
   base_salary: number
   current_salary: number
@@ -18,7 +18,7 @@ function fromRow(row: PlayerRow): Player {
   return {
     id: row.id,
     name: row.name,
-    position: row.position,
+    positions: row.positions,
     isXPlayer: row.is_x_player,
     baseSalary: row.base_salary,
     currentSalary: row.current_salary,
@@ -42,7 +42,7 @@ export async function createPlayer(player: NewPlayer, userId: string): Promise<P
     .insert({
       user_id: userId,
       name: player.name,
-      position: player.position,
+      positions: player.positions,
       is_x_player: player.isXPlayer,
       base_salary: player.baseSalary,
       current_salary: player.currentSalary,
@@ -61,7 +61,7 @@ export async function updatePlayer(id: string, player: NewPlayer): Promise<Playe
     .from('players')
     .update({
       name: player.name,
-      position: player.position,
+      positions: player.positions,
       is_x_player: player.isXPlayer,
       base_salary: player.baseSalary,
       current_salary: player.currentSalary,
