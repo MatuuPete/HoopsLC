@@ -1,4 +1,4 @@
-import type { LineupResult, LineupSlot } from '../optimizer/types'
+import type { LineupResult, LineupSlot, Player } from '../optimizer/types'
 
 function sumOffense(slots: LineupSlot[]): number {
   return slots.reduce((sum, slot) => sum + slot.player.offense, 0)
@@ -8,13 +8,29 @@ function sumDefense(slots: LineupSlot[]): number {
   return slots.reduce((sum, slot) => sum + slot.player.defense, 0)
 }
 
-export function LineupResultPanel({ result }: { result: LineupResult | null }) {
+interface LineupResultPanelProps {
+  result: LineupResult | null
+  players: Player[]
+}
+
+export function LineupResultPanel({ result, players }: LineupResultPanelProps) {
   if (!result) return null
 
   if (!result.success && result.reason === 'missing_position') {
     return (
       <div className="border border-border bg-panel p-4 text-sm text-red-400">
         Missing owned players for: {result.missingPositions.join(', ')}
+      </div>
+    )
+  }
+
+  if (!result.success && result.reason === 'required_players_conflict') {
+    const names = result.conflictingPlayerIds
+      .map((id) => players.find((p) => p.id === id)?.name ?? id)
+      .join(', ')
+    return (
+      <div className="border border-border bg-panel p-4 text-sm text-red-400">
+        Required players can't all fit in one lineup: {names}. Try unchecking one.
       </div>
     )
   }
