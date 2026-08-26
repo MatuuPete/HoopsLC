@@ -1,9 +1,26 @@
-import { POSITIONS, type Player, type LineupResult, type LineupSlot, type Position } from './types'
+import {
+  POSITIONS,
+  type LineupPreferences,
+  type LineupResult,
+  type LineupSlot,
+  type Player,
+  type Position,
+} from './types'
 
 const CENTS = 100
+const STAT_SCALE = 1000
 
 function toCents(amount: number): number {
   return Math.round(amount * CENTS)
+}
+
+function computeValue(player: Player, preferences: LineupPreferences): number {
+  if (preferences.objectiveMode === 'power') {
+    return toCents(player.currentSalary)
+  }
+  const offenseScale = Math.round(preferences.offenseWeight * STAT_SCALE)
+  const defenseScale = STAT_SCALE - offenseScale
+  return offenseScale * player.offense + defenseScale * player.defense
 }
 
 function slotBit(position: Position): number {
@@ -14,28 +31,26 @@ const FULL_MASK = (1 << POSITIONS.length) - 1
 
 interface Cell {
   costCents: number
-  valueCents: number
+  value: number
   player: Player | null
   slot: Position | null
   source: Cell | null
 }
 
-/** Sorted by costCents ascending, with valueCents strictly increasing — no point is dominated by a cheaper-or-equal one. */
+/** Sorted by costCents ascending, with value strictly increasing — no point is dominated by a cheaper-or-equal one. */
 type Frontier = Cell[]
 
-const BASE_CELL: Cell = { costCents: 0, valueCents: 0, player: null, slot: null, source: null }
+const BASE_CELL: Cell = { costCents: 0, value: 0, player: null, slot: null, source: null }
 
 /** Merges new candidate points into an existing frontier, dropping anything dominated. */
 function mergeFrontier(existing: Frontier, candidates: Cell[]): Frontier {
-  const all = [...existing, ...candidates].sort(
-    (a, b) => a.costCents - b.costCents || b.valueCents - a.valueCents,
-  )
+  const all = [...existing, ...candidates].sort((a, b) => a.costCents - b.costCents || b.value - a.value)
   const merged: Frontier = []
-  let bestValue = -1
+  let bestValue = -Infinity
   for (const cell of all) {
-    if (cell.valueCents > bestValue) {
+    if (cell.value > bestValue) {
       merged.push(cell)
-      bestValue = cell.valueCents
+      bestValue = cell.value
     }
   }
   return merged
@@ -52,23 +67,20 @@ function popcount(mask: number): number {
 }
 
 /**
- * dp[mask][hasX] = the Pareto frontier (cost -> best value, cost ascending,
- * value strictly increasing) reachable using players considered so far,
- * filling exactly the slots in `mask` (one player each), tracking whether
- * one of them is an X Player.
- *
- * Unlike a budget-indexed array, this frontier's size depends on how many
- * distinct non-dominated (cost, value) combinations exist among the
- * players actually owned — not on the cap's magnitude — so this stays
- * fast regardless of how large a salary cap gets entered.
- *
- * Mutated in place, one player at a time. Within a single player's pass,
- * destination masks are processed in decreasing popcount order so that a
- * player's own transitions always read state from before this player was
- * considered — otherwise the same player could end up placed into two
- * slots in one pass.
+ * dp[mask][hasX] = the Pareto frontier reachable using `players`, starting
+ * from `seedMask`/`seedHasX`/`seedCell` instead of always starting empty —
+ * this is how required players get folded in: their slots/cost/value are
+ * baked into the seed before this DP runs, over the remaining
+ * (non-required) players only. See findBestLineup for how the seed and
+ * player list are built per required-player assignment.
  */
-function runAssignmentDp(players: Player[]): Frontier[][] {
+function runAssignmentDp(
+  players: Player[],
+  preferences: LineupPreferences,
+  seedMask: number,
+  seedHasX: number,
+  seedCell: Cell,
+): Frontier[][] {
   const masksByPopcount: number[][] = Array.from({ length: POSITIONS.length + 1 }, () => [])
   for (let mask = 0; mask <= FULL_MASK; mask++) {
     masksByPopcount[popcount(mask)].push(mask)
@@ -78,11 +90,11 @@ function runAssignmentDp(players: Player[]): Frontier[][] {
   for (let mask = 0; mask <= FULL_MASK; mask++) {
     dp[mask] = [[], []]
   }
-  dp[0][0] = [BASE_CELL]
+  dp[seedMask][seedHasX] = [seedCell]
 
   for (const player of players) {
     const cost = toCents(player.baseSalary)
-    const value = toCents(player.currentSalary)
+    const value = computeValue(player, preferences)
     const bits = player.positions.map((p) => ({ position: p, bit: slotBit(p) }))
 
     for (let level = POSITIONS.length; level >= 1; level--) {
@@ -99,7 +111,7 @@ function runAssignmentDp(players: Player[]): Frontier[][] {
 
             const candidates: Cell[] = sourceFrontier.map((point) => ({
               costCents: point.costCents + cost,
-              valueCents: point.valueCents + value,
+              value: point.value + value,
               player,
               slot: position,
               source: point,
@@ -132,7 +144,59 @@ function bestUnderCap(frontier: Frontier, capCents: number): Cell | null {
   return best
 }
 
-export function findBestLineup(players: Player[], salaryCap: number): LineupResult {
+function totalCurrentSalary(slots: LineupSlot[]): number {
+  return slots.reduce((sum, slot) => sum + slot.player.currentSalary, 0)
+}
+
+/** Every way to assign `requiredPlayers` to distinct slots they're each eligible for. */
+function enumerateRequiredAssignments(requiredPlayers: Player[]): LineupSlot[][] {
+  const results: LineupSlot[][] = []
+
+  function backtrack(index: number, usedMask: number, current: LineupSlot[]) {
+    if (index === requiredPlayers.length) {
+      results.push([...current])
+      return
+    }
+    const player = requiredPlayers[index]
+    for (const position of player.positions) {
+      const bit = slotBit(position)
+      if (usedMask & bit) continue
+      current.push({ position, player })
+      backtrack(index + 1, usedMask | bit, current)
+      current.pop()
+    }
+  }
+
+  backtrack(0, 0, [])
+  return results
+}
+
+function buildSeed(
+  assignment: LineupSlot[],
+  preferences: LineupPreferences,
+): { mask: number; hasX: number; cell: Cell } {
+  let mask = 0
+  let hasX = 0
+  let cell: Cell = BASE_CELL
+  for (const slot of assignment) {
+    mask |= slotBit(slot.position)
+    if (slot.player.isXPlayer) hasX = 1
+    cell = {
+      costCents: cell.costCents + toCents(slot.player.baseSalary),
+      value: cell.value + computeValue(slot.player, preferences),
+      player: slot.player,
+      slot: slot.position,
+      source: cell,
+    }
+  }
+  return { mask, hasX, cell }
+}
+
+export function findBestLineup(
+  players: Player[],
+  salaryCap: number,
+  preferences: LineupPreferences,
+): LineupResult {
   const missingPositions = POSITIONS.filter(
     (position) => !players.some((player) => player.positions.includes(position)),
   )
@@ -140,45 +204,83 @@ export function findBestLineup(players: Player[], salaryCap: number): LineupResu
     return { success: false, reason: 'missing_position', missingPositions }
   }
 
-  const capCents = toCents(salaryCap)
-  const sortedPlayers = [...players].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
-  const dp = runAssignmentDp(sortedPlayers)
-  const targetFrontier = dp[FULL_MASK][1]
+  const requiredPlayers = players.filter((p) => preferences.requiredPlayerIds.includes(p.id))
+  const assignments =
+    requiredPlayers.length > 0 && requiredPlayers.length <= POSITIONS.length
+      ? enumerateRequiredAssignments(requiredPlayers)
+      : []
 
-  const feasibleCell = bestUnderCap(targetFrontier, capCents)
-  if (feasibleCell) {
-    return {
-      success: true,
-      slots: reconstruct(feasibleCell),
-      totalBaseSalary: feasibleCell.costCents / CENTS,
-      totalCurrentSalary: feasibleCell.valueCents / CENTS,
-      remainingCap: salaryCap - feasibleCell.costCents / CENTS,
-    }
-  }
-
-  if (targetFrontier.length === 0) {
-    const positionsWithoutXPlayer = POSITIONS.filter(
-      (p) => !players.some((player) => player.isXPlayer && player.positions.includes(p)),
-    )
-    const positionsWithoutRegularPlayer = POSITIONS.filter(
-      (p) => !players.some((player) => !player.isXPlayer && player.positions.includes(p)),
-    )
+  if (requiredPlayers.length > 0 && assignments.length === 0) {
     return {
       success: false,
-      reason: 'no_valid_x_slot',
-      positionsWithoutXPlayer,
-      positionsWithoutRegularPlayer,
+      reason: 'required_players_conflict',
+      conflictingPlayerIds: requiredPlayers.map((p) => p.id),
     }
   }
 
-  // Not empty and nothing fit under the cap: the cheapest point is the frontier's first
-  // entry (sorted ascending by cost).
-  const cheapest = targetFrontier[0]
-  return {
-    success: false,
-    reason: 'cap_too_low',
-    cheapestPossibleBaseSalary: cheapest.costCents / CENTS,
-    closestLineup: reconstruct(cheapest),
-    closestTotalCurrentSalary: cheapest.valueCents / CENTS,
+  const seedAssignments = assignments.length > 0 ? assignments : [[] as LineupSlot[]]
+  const capCents = toCents(salaryCap)
+
+  let bestFeasible: Cell | null = null
+  let firstFailure: LineupResult | null = null
+
+  for (const assignment of seedAssignments) {
+    const { mask, hasX, cell: seedCell } = buildSeed(assignment, preferences)
+    const usedIds = new Set(assignment.map((s) => s.player.id))
+    const remainingPlayers = players.filter((p) => !usedIds.has(p.id))
+    const sortedPlayers = [...remainingPlayers].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+
+    const dp = runAssignmentDp(sortedPlayers, preferences, mask, hasX, seedCell)
+    const targetFrontier = dp[FULL_MASK][1]
+    const feasibleCell = bestUnderCap(targetFrontier, capCents)
+
+    if (
+      feasibleCell &&
+      (!bestFeasible ||
+        feasibleCell.value > bestFeasible.value ||
+        (feasibleCell.value === bestFeasible.value && feasibleCell.costCents < bestFeasible.costCents))
+    ) {
+      bestFeasible = feasibleCell
+    }
+
+    if (!feasibleCell && !firstFailure) {
+      if (targetFrontier.length === 0) {
+        const positionsWithoutXPlayer = POSITIONS.filter(
+          (p) => !players.some((player) => player.isXPlayer && player.positions.includes(p)),
+        )
+        const positionsWithoutRegularPlayer = POSITIONS.filter(
+          (p) => !players.some((player) => !player.isXPlayer && player.positions.includes(p)),
+        )
+        firstFailure = {
+          success: false,
+          reason: 'no_valid_x_slot',
+          positionsWithoutXPlayer,
+          positionsWithoutRegularPlayer,
+        }
+      } else {
+        const cheapest = targetFrontier[0]
+        const closestLineup = reconstruct(cheapest)
+        firstFailure = {
+          success: false,
+          reason: 'cap_too_low',
+          cheapestPossibleBaseSalary: cheapest.costCents / CENTS,
+          closestLineup,
+          closestTotalCurrentSalary: totalCurrentSalary(closestLineup),
+        }
+      }
+    }
   }
+
+  if (bestFeasible) {
+    const slots = reconstruct(bestFeasible)
+    return {
+      success: true,
+      slots,
+      totalBaseSalary: bestFeasible.costCents / CENTS,
+      totalCurrentSalary: totalCurrentSalary(slots),
+      remainingCap: salaryCap - bestFeasible.costCents / CENTS,
+    }
+  }
+
+  return firstFailure as LineupResult
 }

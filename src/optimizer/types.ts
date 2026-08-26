@@ -19,6 +19,14 @@ export interface LineupSlot {
   player: Player
 }
 
+export type ObjectiveMode = 'power' | 'stats'
+
+export interface LineupPreferences {
+  requiredPlayerIds: string[]
+  objectiveMode: ObjectiveMode
+  offenseWeight: number
+}
+
 export interface LineupSuccess {
   success: true
   slots: LineupSlot[]
@@ -48,8 +56,15 @@ export interface LineupNoValidXSlot {
   positionsWithoutRegularPlayer: Position[]
 }
 
+export interface LineupRequiredPlayersConflict {
+  success: false
+  reason: 'required_players_conflict'
+  conflictingPlayerIds: string[]
+}
+
 export type LineupResult =
   | LineupSuccess
   | LineupMissingPosition
   | LineupCapTooLow
   | LineupNoValidXSlot
+  | LineupRequiredPlayersConflict

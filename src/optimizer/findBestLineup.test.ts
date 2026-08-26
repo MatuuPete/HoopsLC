@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import { findBestLineup } from './findBestLineup'
-import type { Player } from './types'
+import type { LineupPreferences, Player } from './types'
+
+const DEFAULT_PREFERENCES: LineupPreferences = {
+  requiredPlayerIds: [],
+  objectiveMode: 'power',
+  offenseWeight: 0.5,
+}
 
 function makePlayer(overrides: Partial<Player> & Pick<Player, 'id' | 'positions'>): Player {
   return {
@@ -30,7 +36,7 @@ describe('findBestLineup', () => {
       makePlayer({ id: 'c-x', positions: ['C'], isXPlayer: true, baseSalary: 200, currentSalary: 150 }),
     ]
 
-    const result = findBestLineup(players, 600)
+    const result = findBestLineup(players, 600, DEFAULT_PREFERENCES)
 
     expect(result.success).toBe(true)
     if (!result.success) return
@@ -54,7 +60,7 @@ describe('findBestLineup', () => {
       makePlayer({ id: 'c-1', positions: ['C'] }),
     ]
 
-    const result = findBestLineup(players, 1000)
+    const result = findBestLineup(players, 1000, DEFAULT_PREFERENCES)
 
     expect(result.success).toBe(false)
     if (result.success) return
@@ -71,7 +77,7 @@ describe('findBestLineup', () => {
       makePlayer({ id: 'c-1', positions: ['C'] }),
     ]
 
-    const result = findBestLineup(players, 1000)
+    const result = findBestLineup(players, 1000, DEFAULT_PREFERENCES)
 
     expect(result.success).toBe(false)
     if (result.success) return
@@ -89,7 +95,7 @@ describe('findBestLineup', () => {
       makePlayer({ id: 'c-1', positions: ['C'] }),
     ]
 
-    const result = findBestLineup(players, 1000)
+    const result = findBestLineup(players, 1000, DEFAULT_PREFERENCES)
 
     expect(result.success).toBe(false)
     if (result.success) return
@@ -112,7 +118,7 @@ describe('findBestLineup', () => {
       makePlayer({ id: 'c-x', positions: ['C'], isXPlayer: true, baseSalary: 300, currentSalary: 300 }),
     ]
 
-    const result = findBestLineup(players, 700)
+    const result = findBestLineup(players, 700, DEFAULT_PREFERENCES)
 
     expect(result.success).toBe(false)
     if (result.success) return
@@ -134,7 +140,7 @@ describe('findBestLineup', () => {
       makePlayer({ id: 'c-1', positions: ['C'], baseSalary: 50, currentSalary: 50 }),
     ]
 
-    const result = findBestLineup(players, 1250)
+    const result = findBestLineup(players, 1250, DEFAULT_PREFERENCES)
 
     expect(result.success).toBe(true)
     if (!result.success) return
@@ -147,13 +153,12 @@ describe('findBestLineup', () => {
     const players: Player[] = [
       makePlayer({ id: 'pg-x', positions: ['PG'], isXPlayer: true, baseSalary: 100, currentSalary: 100 }),
       makePlayer({ id: 'sg-1', positions: ['SG'], baseSalary: 100, currentSalary: 100 }),
-      // Only candidate for PF; also eligible for SF, where sf-cheap is the fallback.
       makePlayer({ id: 'flex', positions: ['SF', 'PF'], baseSalary: 100, currentSalary: 500 }),
       makePlayer({ id: 'sf-cheap', positions: ['SF'], baseSalary: 50, currentSalary: 50 }),
       makePlayer({ id: 'c-1', positions: ['C'], baseSalary: 100, currentSalary: 100 }),
     ]
 
-    const result = findBestLineup(players, 1000)
+    const result = findBestLineup(players, 1000, DEFAULT_PREFERENCES)
 
     expect(result.success).toBe(true)
     if (!result.success) return
@@ -166,7 +171,6 @@ describe('findBestLineup', () => {
   it('never places the same shared player into two slots at once', () => {
     const players: Player[] = [
       makePlayer({ id: 'pg-x', positions: ['PG'], isXPlayer: true, baseSalary: 100, currentSalary: 100 }),
-      // Best candidate at both SG and SF, but can only fill one.
       makePlayer({ id: 'flex', positions: ['SG', 'SF'], baseSalary: 100, currentSalary: 300 }),
       makePlayer({ id: 'sg-alt', positions: ['SG'], baseSalary: 100, currentSalary: 150 }),
       makePlayer({ id: 'sf-alt', positions: ['SF'], baseSalary: 100, currentSalary: 150 }),
@@ -174,7 +178,7 @@ describe('findBestLineup', () => {
       makePlayer({ id: 'c-1', positions: ['C'], baseSalary: 100, currentSalary: 100 }),
     ]
 
-    const result = findBestLineup(players, 1000)
+    const result = findBestLineup(players, 1000, DEFAULT_PREFERENCES)
 
     expect(result.success).toBe(true)
     if (!result.success) return
@@ -193,7 +197,7 @@ describe('findBestLineup', () => {
       makePlayer({ id: 'c-1', positions: ['C'], baseSalary: 100, currentSalary: 100 }),
     ]
 
-    const result = findBestLineup(players, 1000)
+    const result = findBestLineup(players, 1000, DEFAULT_PREFERENCES)
 
     expect(result.success).toBe(true)
     if (!result.success) return
@@ -201,5 +205,199 @@ describe('findBestLineup', () => {
     expect(result.slots.filter((s) => s.player.id === 'x-flex')).toHaveLength(1)
     expect(result.totalCurrentSalary).toBe(800)
     expect(result.totalBaseSalary).toBe(500)
+  })
+
+  it('forces a required player into the lineup even when they are not the best choice for their slot', () => {
+    const players: Player[] = [
+      makePlayer({ id: 'pg-x', positions: ['PG'], isXPlayer: true, baseSalary: 100, currentSalary: 100 }),
+      makePlayer({ id: 'sg-best', positions: ['SG'], baseSalary: 100, currentSalary: 300 }),
+      makePlayer({ id: 'sg-required', positions: ['SG'], baseSalary: 100, currentSalary: 150 }),
+      makePlayer({ id: 'sf-1', positions: ['SF'], baseSalary: 100, currentSalary: 100 }),
+      makePlayer({ id: 'pf-1', positions: ['PF'], baseSalary: 100, currentSalary: 100 }),
+      makePlayer({ id: 'c-1', positions: ['C'], baseSalary: 100, currentSalary: 100 }),
+    ]
+
+    const result = findBestLineup(players, 1000, { ...DEFAULT_PREFERENCES, requiredPlayerIds: ['sg-required'] })
+
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.slots.find((s) => s.position === 'SG')?.player.id).toBe('sg-required')
+  })
+
+  it('reports required_players_conflict when two required players share their only eligible position', () => {
+    const players: Player[] = [
+      makePlayer({ id: 'pg-x', positions: ['PG'], isXPlayer: true }),
+      makePlayer({ id: 'sg-a', positions: ['SG'] }),
+      makePlayer({ id: 'sg-b', positions: ['SG'] }),
+      makePlayer({ id: 'sf-1', positions: ['SF'] }),
+      makePlayer({ id: 'pf-1', positions: ['PF'] }),
+      makePlayer({ id: 'c-1', positions: ['C'] }),
+    ]
+
+    const result = findBestLineup(players, 1000, {
+      ...DEFAULT_PREFERENCES,
+      requiredPlayerIds: ['sg-a', 'sg-b'],
+    })
+
+    expect(result.success).toBe(false)
+    if (result.success) return
+    if (result.reason !== 'required_players_conflict') throw new Error('expected required_players_conflict')
+    expect([...result.conflictingPlayerIds].sort()).toEqual(['sg-a', 'sg-b'])
+  })
+
+  it('reports required_players_conflict when more than 5 players are required', () => {
+    const players: Player[] = [
+      makePlayer({ id: 'pg-x', positions: ['PG'], isXPlayer: true }),
+      makePlayer({ id: 'sg-1', positions: ['SG'] }),
+      makePlayer({ id: 'sf-1', positions: ['SF'] }),
+      makePlayer({ id: 'pf-1', positions: ['PF'] }),
+      makePlayer({ id: 'c-1', positions: ['C'] }),
+      makePlayer({ id: 'extra', positions: ['PG'] }),
+    ]
+
+    const result = findBestLineup(players, 1000, {
+      ...DEFAULT_PREFERENCES,
+      requiredPlayerIds: ['pg-x', 'sg-1', 'sf-1', 'pf-1', 'c-1', 'extra'],
+    })
+
+    expect(result.success).toBe(false)
+    if (result.success) return
+    if (result.reason !== 'required_players_conflict') throw new Error('expected required_players_conflict')
+  })
+
+  it('lets a required X Player satisfy the exactly-one-X-Player rule without needing another', () => {
+    const players: Player[] = [
+      makePlayer({ id: 'pg-required-x', positions: ['PG'], isXPlayer: true, baseSalary: 100, currentSalary: 100 }),
+      makePlayer({ id: 'pg-other-x', positions: ['PG'], isXPlayer: true, baseSalary: 100, currentSalary: 400 }),
+      makePlayer({ id: 'sg-1', positions: ['SG'] }),
+      makePlayer({ id: 'sf-1', positions: ['SF'] }),
+      makePlayer({ id: 'pf-1', positions: ['PF'] }),
+      makePlayer({ id: 'c-1', positions: ['C'] }),
+    ]
+
+    const result = findBestLineup(players, 1000, {
+      ...DEFAULT_PREFERENCES,
+      requiredPlayerIds: ['pg-required-x'],
+    })
+
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.slots.filter((s) => s.player.isXPlayer)).toHaveLength(1)
+    expect(result.slots.find((s) => s.position === 'PG')?.player.id).toBe('pg-required-x')
+  })
+
+  it('prioritizes offense over price when objective mode is stats with offenseWeight 1', () => {
+    const players: Player[] = [
+      makePlayer({
+        id: 'pg-x',
+        positions: ['PG'],
+        isXPlayer: true,
+        baseSalary: 100,
+        currentSalary: 100,
+        offense: 100,
+        defense: 100,
+      }),
+      makePlayer({ id: 'sg-rich', positions: ['SG'], baseSalary: 100, currentSalary: 500, offense: 50, defense: 50 }),
+      makePlayer({
+        id: 'sg-offense',
+        positions: ['SG'],
+        baseSalary: 100,
+        currentSalary: 100,
+        offense: 300,
+        defense: 10,
+      }),
+      makePlayer({ id: 'sf-1', positions: ['SF'], baseSalary: 100, currentSalary: 100, offense: 50, defense: 50 }),
+      makePlayer({ id: 'pf-1', positions: ['PF'], baseSalary: 100, currentSalary: 100, offense: 50, defense: 50 }),
+      makePlayer({ id: 'c-1', positions: ['C'], baseSalary: 100, currentSalary: 100, offense: 50, defense: 50 }),
+    ]
+
+    const result = findBestLineup(players, 1000, {
+      requiredPlayerIds: [],
+      objectiveMode: 'stats',
+      offenseWeight: 1,
+    })
+
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.slots.find((s) => s.position === 'SG')?.player.id).toBe('sg-offense')
+  })
+
+  it('prioritizes defense over price when objective mode is stats with offenseWeight 0', () => {
+    const players: Player[] = [
+      makePlayer({
+        id: 'pg-x',
+        positions: ['PG'],
+        isXPlayer: true,
+        baseSalary: 100,
+        currentSalary: 100,
+        offense: 100,
+        defense: 100,
+      }),
+      makePlayer({ id: 'sg-rich', positions: ['SG'], baseSalary: 100, currentSalary: 500, offense: 50, defense: 50 }),
+      makePlayer({
+        id: 'sg-defense',
+        positions: ['SG'],
+        baseSalary: 100,
+        currentSalary: 100,
+        offense: 10,
+        defense: 300,
+      }),
+      makePlayer({ id: 'sf-1', positions: ['SF'], baseSalary: 100, currentSalary: 100, offense: 50, defense: 50 }),
+      makePlayer({ id: 'pf-1', positions: ['PF'], baseSalary: 100, currentSalary: 100, offense: 50, defense: 50 }),
+      makePlayer({ id: 'c-1', positions: ['C'], baseSalary: 100, currentSalary: 100, offense: 50, defense: 50 }),
+    ]
+
+    const result = findBestLineup(players, 1000, {
+      requiredPlayerIds: [],
+      objectiveMode: 'stats',
+      offenseWeight: 0,
+    })
+
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.slots.find((s) => s.position === 'SG')?.player.id).toBe('sg-defense')
+  })
+
+  it('sums offense and defense equally when objective mode is stats with offenseWeight 0.5', () => {
+    const players: Player[] = [
+      makePlayer({
+        id: 'pg-x',
+        positions: ['PG'],
+        isXPlayer: true,
+        baseSalary: 100,
+        currentSalary: 100,
+        offense: 100,
+        defense: 100,
+      }),
+      makePlayer({
+        id: 'sg-balanced',
+        positions: ['SG'],
+        baseSalary: 100,
+        currentSalary: 100,
+        offense: 125,
+        defense: 125,
+      }),
+      makePlayer({
+        id: 'sg-offense-heavy',
+        positions: ['SG'],
+        baseSalary: 100,
+        currentSalary: 100,
+        offense: 200,
+        defense: 40,
+      }),
+      makePlayer({ id: 'sf-1', positions: ['SF'], baseSalary: 100, currentSalary: 100, offense: 50, defense: 50 }),
+      makePlayer({ id: 'pf-1', positions: ['PF'], baseSalary: 100, currentSalary: 100, offense: 50, defense: 50 }),
+      makePlayer({ id: 'c-1', positions: ['C'], baseSalary: 100, currentSalary: 100, offense: 50, defense: 50 }),
+    ]
+
+    const result = findBestLineup(players, 1000, {
+      requiredPlayerIds: [],
+      objectiveMode: 'stats',
+      offenseWeight: 0.5,
+    })
+
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.slots.find((s) => s.position === 'SG')?.player.id).toBe('sg-balanced')
   })
 })
