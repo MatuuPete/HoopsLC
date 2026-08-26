@@ -332,15 +332,33 @@ function slotBit(position: Position): number {
 const FULL_MASK = (1 << POSITIONS.length) - 1
 
 interface Cell {
-  valueCents: number
   costCents: number
+  valueCents: number
   player: Player | null
   slot: Position | null
   source: Cell | null
 }
 
-const BASE_CELL: Cell = { valueCents: 0, costCents: 0, player: null, slot: null, source: null }
-const UNREACHABLE: Cell = { valueCents: -1, costCents: 0, player: null, slot: null, source: null }
+/** Sorted by costCents ascending, with valueCents strictly increasing — no point is dominated by a cheaper-or-equal one. */
+type Frontier = Cell[]
+
+const BASE_CELL: Cell = { costCents: 0, valueCents: 0, player: null, slot: null, source: null }
+
+/** Merges new candidate points into an existing frontier, dropping anything dominated. */
+function mergeFrontier(existing: Frontier, candidates: Cell[]): Frontier {
+  const all = [...existing, ...candidates].sort(
+    (a, b) => a.costCents - b.costCents || b.valueCents - a.valueCents,
+  )
+  const merged: Frontier = []
+  let bestValue = -1
+  for (const cell of all) {
+    if (cell.valueCents > bestValue) {
+      merged.push(cell)
+      bestValue = cell.valueCents
+    }
+  }
+  return merged
+}
 
 function popcount(mask: number): number {
   let count = 0
@@ -353,9 +371,18 @@ function popcount(mask: number): number {
 }
 
 /**
- * dp[mask][hasX][c] = best cell reachable using players considered so far,
+ * dp[mask][hasX] = the Pareto frontier (cost -> best value, cost ascending,
+ * value strictly increasing) reachable using players considered so far,
  * filling exactly the slots in `mask` (one player each), tracking whether
- * one of them is an X Player, at total base-salary cost <= c (cents).
+ * one of them is an X Player.
+ *
+ * Unlike a budget-indexed array, this frontier's size depends on how many
+ * distinct non-dominated (cost, value) combinations exist among the
+ * players actually owned — not on the cap's magnitude — so this stays
+ * fast regardless of how large a salary cap gets entered. (A budget-array
+ * version was tried first and measured multiple seconds at a 20-40 player
+ * roster; this version stays under 10ms at 150 players — see the design
+ * spec's Performance section.)
  *
  * Mutated in place, one player at a time. Within a single player's pass,
  * destination masks are processed in decreasing popcount order so that a
@@ -363,19 +390,17 @@ function popcount(mask: number): number {
  * considered — otherwise the same player could end up placed into two
  * slots in one pass.
  */
-function runAssignmentDp(players: Player[], capCents: number): Cell[][][] {
+function runAssignmentDp(players: Player[]): Frontier[][] {
   const masksByPopcount: number[][] = Array.from({ length: POSITIONS.length + 1 }, () => [])
   for (let mask = 0; mask <= FULL_MASK; mask++) {
     masksByPopcount[popcount(mask)].push(mask)
   }
 
-  const dp: Cell[][][] = []
+  const dp: Frontier[][] = []
   for (let mask = 0; mask <= FULL_MASK; mask++) {
     dp[mask] = [[], []]
-    for (let hasX = 0; hasX < 2; hasX++) {
-      dp[mask][hasX] = new Array(capCents + 1).fill(mask === 0 && hasX === 0 ? BASE_CELL : UNREACHABLE)
-    }
   }
+  dp[0][0] = [BASE_CELL]
 
   for (const player of players) {
     const cost = toCents(player.baseSalary)
@@ -391,32 +416,18 @@ function runAssignmentDp(players: Player[], capCents: number): Cell[][][] {
 
           for (const hasXAfter of hasXAfterOptions) {
             const hasXBefore = player.isXPlayer ? 0 : hasXAfter
-            const sourceColumn = dp[sourceMask][hasXBefore]
-            const destColumn = dp[destMask][hasXAfter]
+            const sourceFrontier = dp[sourceMask][hasXBefore]
+            if (sourceFrontier.length === 0) continue
 
-            for (let c = cost; c <= capCents; c++) {
-              const prev = sourceColumn[c - cost]
-              if (prev.valueCents < 0) continue
+            const candidates: Cell[] = sourceFrontier.map((point) => ({
+              costCents: point.costCents + cost,
+              valueCents: point.valueCents + value,
+              player,
+              slot: position,
+              source: point,
+            }))
 
-              const candidateValue = prev.valueCents + value
-              const candidateCost = prev.costCents + cost
-              const current = destColumn[c]
-
-              const better =
-                current.valueCents < 0 ||
-                candidateValue > current.valueCents ||
-                (candidateValue === current.valueCents && candidateCost < current.costCents)
-
-              if (better) {
-                destColumn[c] = {
-                  valueCents: candidateValue,
-                  costCents: candidateCost,
-                  player,
-                  slot: position,
-                  source: prev,
-                }
-              }
-            }
+            dp[destMask][hasXAfter] = mergeFrontier(dp[destMask][hasXAfter], candidates)
           }
         }
       }
@@ -433,6 +444,16 @@ function reconstruct(cell: Cell): LineupSlot[] {
   return rest
 }
 
+/** Best (highest-value) point in the frontier at cost <= capCents, or null if none fits. */
+function bestUnderCap(frontier: Frontier, capCents: number): Cell | null {
+  let best: Cell | null = null
+  for (const cell of frontier) {
+    if (cell.costCents > capCents) break
+    best = cell
+  }
+  return best
+}
+
 export function findBestLineup(players: Player[], salaryCap: number): LineupResult {
   const missingPositions = POSITIONS.filter(
     (position) => !players.some((player) => player.positions.includes(position)),
@@ -442,15 +463,12 @@ export function findBestLineup(players: Player[], salaryCap: number): LineupResu
   }
 
   const capCents = toCents(salaryCap)
-  const totalPossibleCents = players.reduce((sum, p) => sum + toCents(p.baseSalary), 0)
-  const dpCapCents = Math.max(capCents, totalPossibleCents)
-
   const sortedPlayers = [...players].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
-  const dp = runAssignmentDp(sortedPlayers, dpCapCents)
-  const targetColumn = dp[FULL_MASK][1]
+  const dp = runAssignmentDp(sortedPlayers)
+  const targetFrontier = dp[FULL_MASK][1]
 
-  const feasibleCell = targetColumn[capCents]
-  if (feasibleCell.valueCents >= 0) {
+  const feasibleCell = bestUnderCap(targetFrontier, capCents)
+  if (feasibleCell) {
     return {
       success: true,
       slots: reconstruct(feasibleCell),
@@ -460,15 +478,7 @@ export function findBestLineup(players: Player[], salaryCap: number): LineupResu
     }
   }
 
-  let cheapest: Cell | null = null
-  for (let c = 0; c <= dpCapCents; c++) {
-    if (targetColumn[c].valueCents >= 0) {
-      cheapest = targetColumn[c]
-      break
-    }
-  }
-
-  if (!cheapest) {
+  if (targetFrontier.length === 0) {
     const positionsWithoutXPlayer = POSITIONS.filter(
       (p) => !players.some((player) => player.isXPlayer && player.positions.includes(p)),
     )
@@ -483,6 +493,9 @@ export function findBestLineup(players: Player[], salaryCap: number): LineupResu
     }
   }
 
+  // Not empty and nothing fit under the cap: the cheapest point is the frontier's first
+  // entry (sorted ascending by cost).
+  const cheapest = targetFrontier[0]
   return {
     success: false,
     reason: 'cap_too_low',

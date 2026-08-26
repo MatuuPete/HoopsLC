@@ -6,123 +6,163 @@ function toCents(amount: number): number {
   return Math.round(amount * CENTS)
 }
 
-type KnapsackResult =
-  | { feasible: true; slots: LineupSlot[]; totalCurrentSalary: number; totalBaseSalary: number }
-  | { feasible: false; cheapestCents: number; cheapestSlots: LineupSlot[]; cheapestCurrentSalary: number }
-
-/** Solves the one-player-per-position knapsack for a fixed set of candidate groups (already non-empty and id-sorted per position). */
-function solveKnapsack(groups: Record<Position, Player[]>, capCents: number): KnapsackResult {
-  const cheapestSlots: LineupSlot[] = POSITIONS.map((position) => {
-    let cheapest = groups[position][0]
-    for (const player of groups[position]) {
-      if (toCents(player.baseSalary) < toCents(cheapest.baseSalary)) cheapest = player
-    }
-    return { position, player: cheapest }
-  })
-  const cheapestCents = cheapestSlots.reduce((sum, slot) => sum + toCents(slot.player.baseSalary), 0)
-
-  if (cheapestCents > capCents) {
-    const cheapestCurrentSalary = cheapestSlots.reduce((sum, slot) => sum + slot.player.currentSalary, 0)
-    return { feasible: false, cheapestCents, cheapestSlots, cheapestCurrentSalary }
-  }
-
-  // dp[c] = best { valueCents, costCents } achievable with total cost <= c using groups processed so far.
-  // valueCents === -1 marks a budget that is not achievable yet.
-  type Cell = { valueCents: number; costCents: number }
-  let dp: Cell[] = new Array(capCents + 1)
-  for (let c = 0; c <= capCents; c++) dp[c] = { valueCents: 0, costCents: 0 }
-
-  const choices: Map<number, Player>[] = []
-
-  for (const position of POSITIONS) {
-    const nextDp: Cell[] = new Array(capCents + 1)
-    const choiceAtBudget = new Map<number, Player>()
-
-    for (let c = 0; c <= capCents; c++) {
-      let best: Cell = { valueCents: -1, costCents: 0 }
-      let bestPlayer: Player | null = null
-
-      for (const player of groups[position]) {
-        const cost = toCents(player.baseSalary)
-        if (cost > c) continue
-        const prev = dp[c - cost]
-        if (prev.valueCents < 0) continue
-
-        const candidateValue = prev.valueCents + toCents(player.currentSalary)
-        const candidateCost = prev.costCents + cost
-
-        const better =
-          candidateValue > best.valueCents ||
-          (candidateValue === best.valueCents && candidateCost < best.costCents)
-
-        if (bestPlayer === null || better) {
-          best = { valueCents: candidateValue, costCents: candidateCost }
-          bestPlayer = player
-        }
-      }
-
-      nextDp[c] = bestPlayer ? best : { valueCents: -1, costCents: 0 }
-      if (bestPlayer) choiceAtBudget.set(c, bestPlayer)
-    }
-
-    dp = nextDp
-    choices.push(choiceAtBudget)
-  }
-
-  const finalCell = dp[capCents]
-  const slots: LineupSlot[] = []
-  let budget = capCents
-
-  for (let g = POSITIONS.length - 1; g >= 0; g--) {
-    const player = choices[g].get(budget)
-    if (!player) {
-      throw new Error('Optimizer reconstruction failed: no player recorded for this budget')
-    }
-    slots.unshift({ position: POSITIONS[g], player })
-    budget -= toCents(player.baseSalary)
-  }
-
-  return {
-    feasible: true,
-    slots,
-    totalCurrentSalary: finalCell.valueCents / CENTS,
-    totalBaseSalary: finalCell.costCents / CENTS,
-  }
+function slotBit(position: Position): number {
+  return 1 << POSITIONS.indexOf(position)
 }
 
-function sortedById(players: Player[]): Player[] {
-  return [...players].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+const FULL_MASK = (1 << POSITIONS.length) - 1
+
+interface Cell {
+  costCents: number
+  valueCents: number
+  player: Player | null
+  slot: Position | null
+  source: Cell | null
+}
+
+/** Sorted by costCents ascending, with valueCents strictly increasing — no point is dominated by a cheaper-or-equal one. */
+type Frontier = Cell[]
+
+const BASE_CELL: Cell = { costCents: 0, valueCents: 0, player: null, slot: null, source: null }
+
+/** Merges new candidate points into an existing frontier, dropping anything dominated. */
+function mergeFrontier(existing: Frontier, candidates: Cell[]): Frontier {
+  const all = [...existing, ...candidates].sort(
+    (a, b) => a.costCents - b.costCents || b.valueCents - a.valueCents,
+  )
+  const merged: Frontier = []
+  let bestValue = -1
+  for (const cell of all) {
+    if (cell.valueCents > bestValue) {
+      merged.push(cell)
+      bestValue = cell.valueCents
+    }
+  }
+  return merged
+}
+
+function popcount(mask: number): number {
+  let count = 0
+  let m = mask
+  while (m) {
+    count += m & 1
+    m >>= 1
+  }
+  return count
+}
+
+/**
+ * dp[mask][hasX] = the Pareto frontier (cost -> best value, cost ascending,
+ * value strictly increasing) reachable using players considered so far,
+ * filling exactly the slots in `mask` (one player each), tracking whether
+ * one of them is an X Player.
+ *
+ * Unlike a budget-indexed array, this frontier's size depends on how many
+ * distinct non-dominated (cost, value) combinations exist among the
+ * players actually owned — not on the cap's magnitude — so this stays
+ * fast regardless of how large a salary cap gets entered.
+ *
+ * Mutated in place, one player at a time. Within a single player's pass,
+ * destination masks are processed in decreasing popcount order so that a
+ * player's own transitions always read state from before this player was
+ * considered — otherwise the same player could end up placed into two
+ * slots in one pass.
+ */
+function runAssignmentDp(players: Player[]): Frontier[][] {
+  const masksByPopcount: number[][] = Array.from({ length: POSITIONS.length + 1 }, () => [])
+  for (let mask = 0; mask <= FULL_MASK; mask++) {
+    masksByPopcount[popcount(mask)].push(mask)
+  }
+
+  const dp: Frontier[][] = []
+  for (let mask = 0; mask <= FULL_MASK; mask++) {
+    dp[mask] = [[], []]
+  }
+  dp[0][0] = [BASE_CELL]
+
+  for (const player of players) {
+    const cost = toCents(player.baseSalary)
+    const value = toCents(player.currentSalary)
+    const bits = player.positions.map((p) => ({ position: p, bit: slotBit(p) }))
+
+    for (let level = POSITIONS.length; level >= 1; level--) {
+      for (const destMask of masksByPopcount[level]) {
+        for (const { position, bit } of bits) {
+          if ((destMask & bit) === 0) continue
+          const sourceMask = destMask & ~bit
+          const hasXAfterOptions = player.isXPlayer ? [1] : [0, 1]
+
+          for (const hasXAfter of hasXAfterOptions) {
+            const hasXBefore = player.isXPlayer ? 0 : hasXAfter
+            const sourceFrontier = dp[sourceMask][hasXBefore]
+            if (sourceFrontier.length === 0) continue
+
+            const candidates: Cell[] = sourceFrontier.map((point) => ({
+              costCents: point.costCents + cost,
+              valueCents: point.valueCents + value,
+              player,
+              slot: position,
+              source: point,
+            }))
+
+            dp[destMask][hasXAfter] = mergeFrontier(dp[destMask][hasXAfter], candidates)
+          }
+        }
+      }
+    }
+  }
+
+  return dp
+}
+
+function reconstruct(cell: Cell): LineupSlot[] {
+  if (cell.source === null) return []
+  const rest = reconstruct(cell.source)
+  rest.push({ position: cell.slot as Position, player: cell.player as Player })
+  return rest
+}
+
+/** Best (highest-value) point in the frontier at cost <= capCents, or null if none fits. */
+function bestUnderCap(frontier: Frontier, capCents: number): Cell | null {
+  let best: Cell | null = null
+  for (const cell of frontier) {
+    if (cell.costCents > capCents) break
+    best = cell
+  }
+  return best
 }
 
 export function findBestLineup(players: Player[], salaryCap: number): LineupResult {
-  const groups: Record<Position, Player[]> = { PG: [], SG: [], SF: [], PF: [], C: [] }
-  for (const player of players) {
-    groups[player.position].push(player)
-  }
-
-  const missingPositions = POSITIONS.filter((position) => groups[position].length === 0)
+  const missingPositions = POSITIONS.filter(
+    (position) => !players.some((player) => player.positions.includes(position)),
+  )
   if (missingPositions.length > 0) {
     return { success: false, reason: 'missing_position', missingPositions }
   }
 
-  const regularGroups: Record<Position, Player[]> = { PG: [], SG: [], SF: [], PF: [], C: [] }
-  const xGroups: Record<Position, Player[]> = { PG: [], SG: [], SF: [], PF: [], C: [] }
-  for (const position of POSITIONS) {
-    regularGroups[position] = sortedById(groups[position].filter((p) => !p.isXPlayer))
-    xGroups[position] = sortedById(groups[position].filter((p) => p.isXPlayer))
+  const capCents = toCents(salaryCap)
+  const sortedPlayers = [...players].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+  const dp = runAssignmentDp(sortedPlayers)
+  const targetFrontier = dp[FULL_MASK][1]
+
+  const feasibleCell = bestUnderCap(targetFrontier, capCents)
+  if (feasibleCell) {
+    return {
+      success: true,
+      slots: reconstruct(feasibleCell),
+      totalBaseSalary: feasibleCell.costCents / CENTS,
+      totalCurrentSalary: feasibleCell.valueCents / CENTS,
+      remainingCap: salaryCap - feasibleCell.costCents / CENTS,
+    }
   }
 
-  const positionsWithoutXPlayer = POSITIONS.filter((p) => xGroups[p].length === 0)
-  const positionsWithoutRegularPlayer = POSITIONS.filter((p) => regularGroups[p].length === 0)
-
-  // A position can host the mandatory X slot only if it has an X candidate and every
-  // other position has a regular candidate to fall back on.
-  const validXPositions = POSITIONS.filter((xPos) => {
-    if (xGroups[xPos].length === 0) return false
-    return POSITIONS.every((other) => other === xPos || regularGroups[other].length > 0)
-  })
-
-  if (validXPositions.length === 0) {
+  if (targetFrontier.length === 0) {
+    const positionsWithoutXPlayer = POSITIONS.filter(
+      (p) => !players.some((player) => player.isXPlayer && player.positions.includes(p)),
+    )
+    const positionsWithoutRegularPlayer = POSITIONS.filter(
+      (p) => !players.some((player) => !player.isXPlayer && player.positions.includes(p)),
+    )
     return {
       success: false,
       reason: 'no_valid_x_slot',
@@ -131,52 +171,14 @@ export function findBestLineup(players: Player[], salaryCap: number): LineupResu
     }
   }
 
-  const capCents = toCents(salaryCap)
-
-  let bestFeasible: { xPos: Position; result: Extract<KnapsackResult, { feasible: true }> } | null = null
-  let bestInfeasible: { xPos: Position; result: Extract<KnapsackResult, { feasible: false }> } | null = null
-
-  for (const xPos of validXPositions) {
-    const groupsForXPos: Record<Position, Player[]> = { PG: [], SG: [], SF: [], PF: [], C: [] }
-    for (const position of POSITIONS) {
-      groupsForXPos[position] = position === xPos ? xGroups[position] : regularGroups[position]
-    }
-
-    const result = solveKnapsack(groupsForXPos, capCents)
-
-    if (result.feasible) {
-      if (
-        !bestFeasible ||
-        result.totalCurrentSalary > bestFeasible.result.totalCurrentSalary ||
-        (result.totalCurrentSalary === bestFeasible.result.totalCurrentSalary &&
-          result.totalBaseSalary < bestFeasible.result.totalBaseSalary)
-      ) {
-        bestFeasible = { xPos, result }
-      }
-    } else if (!bestInfeasible || result.cheapestCents < bestInfeasible.result.cheapestCents) {
-      bestInfeasible = { xPos, result }
-    }
-  }
-
-  if (bestFeasible) {
-    const { result } = bestFeasible
-    return {
-      success: true,
-      slots: result.slots,
-      totalBaseSalary: result.totalBaseSalary,
-      totalCurrentSalary: result.totalCurrentSalary,
-      remainingCap: salaryCap - result.totalBaseSalary,
-    }
-  }
-
-  // bestInfeasible is guaranteed set here: validXPositions is non-empty, so every
-  // iteration produced either a feasible or infeasible result, and none were feasible.
-  const { result } = bestInfeasible!
+  // Not empty and nothing fit under the cap: the cheapest point is the frontier's first
+  // entry (sorted ascending by cost).
+  const cheapest = targetFrontier[0]
   return {
     success: false,
     reason: 'cap_too_low',
-    cheapestPossibleBaseSalary: result.cheapestCents / CENTS,
-    closestLineup: result.cheapestSlots,
-    closestTotalCurrentSalary: result.cheapestCurrentSalary,
+    cheapestPossibleBaseSalary: cheapest.costCents / CENTS,
+    closestLineup: reconstruct(cheapest),
+    closestTotalCurrentSalary: cheapest.valueCents / CENTS,
   }
 }

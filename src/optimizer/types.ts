@@ -5,7 +5,7 @@ export const POSITIONS: Position[] = ['PG', 'SG', 'SF', 'PF', 'C']
 export interface Player {
   id: string
   name: string
-  position: Position
+  positions: Position[]
   isXPlayer: boolean
   baseSalary: number
   currentSalary: number

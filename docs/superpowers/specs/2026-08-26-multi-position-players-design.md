@@ -155,11 +155,21 @@ instead of the old independent per-group checks:
 
 ### Performance
 
-`findBestLineup` runs over a user's own roster (tens of players), not
-the shared catalog (hundreds), so this stays well within what a
-synchronous browser computation handles — the state space grows by a
-constant ~64x/5x factor over today's per-position-host loop, not by
-roster size.
+A budget-indexed DP (one array slot per integer cent up to the cap) was
+tried first and measured too slow in practice — several seconds even
+at a modest roster size, because its cost scales with `capCents ×
+roster size × 64`, and `capCents` alone can be well over a million at
+realistic salary caps. The shipped implementation instead tracks, per
+`(mask, hasX)` state, a **Pareto frontier**: a sorted list of
+`(cost, value)` points where every point is strictly better in value
+than every cheaper-or-equal point (dominated points are pruned on
+every merge). Looking up "best value under the cap" or "cheapest
+complete lineup" is then a linear scan of that frontier, and frontier
+size depends only on how many genuinely distinct, non-dominated
+cost/value combinations exist among the owned players — not on the
+cap's magnitude at all. Measured: under 10ms for a 150-player roster
+at a $12,500 cap, vs. multiple seconds for the budget-indexed version
+at 20-40 players.
 
 ## Testing Strategy
 

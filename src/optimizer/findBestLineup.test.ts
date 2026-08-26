@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { findBestLineup } from './findBestLineup'
 import type { Player } from './types'
 
-function makePlayer(overrides: Partial<Player> & Pick<Player, 'id' | 'position'>): Player {
+function makePlayer(overrides: Partial<Player> & Pick<Player, 'id' | 'positions'>): Player {
   return {
     name: overrides.id,
     isXPlayer: false,
@@ -18,16 +18,16 @@ function makePlayer(overrides: Partial<Player> & Pick<Player, 'id' | 'position'>
 describe('findBestLineup', () => {
   it('requires exactly one X Player and picks the best position for it', () => {
     const players: Player[] = [
-      makePlayer({ id: 'pg-1', position: 'PG', baseSalary: 100, currentSalary: 100 }),
-      makePlayer({ id: 'pg-x', position: 'PG', isXPlayer: true, baseSalary: 200, currentSalary: 150 }),
-      makePlayer({ id: 'sg-1', position: 'SG', baseSalary: 100, currentSalary: 100 }),
-      makePlayer({ id: 'sg-x', position: 'SG', isXPlayer: true, baseSalary: 200, currentSalary: 150 }),
-      makePlayer({ id: 'sf-1', position: 'SF', baseSalary: 100, currentSalary: 100 }),
-      makePlayer({ id: 'sf-x', position: 'SF', isXPlayer: true, baseSalary: 150, currentSalary: 400 }),
-      makePlayer({ id: 'pf-1', position: 'PF', baseSalary: 100, currentSalary: 100 }),
-      makePlayer({ id: 'pf-x', position: 'PF', isXPlayer: true, baseSalary: 200, currentSalary: 150 }),
-      makePlayer({ id: 'c-1', position: 'C', baseSalary: 100, currentSalary: 100 }),
-      makePlayer({ id: 'c-x', position: 'C', isXPlayer: true, baseSalary: 200, currentSalary: 150 }),
+      makePlayer({ id: 'pg-1', positions: ['PG'], baseSalary: 100, currentSalary: 100 }),
+      makePlayer({ id: 'pg-x', positions: ['PG'], isXPlayer: true, baseSalary: 200, currentSalary: 150 }),
+      makePlayer({ id: 'sg-1', positions: ['SG'], baseSalary: 100, currentSalary: 100 }),
+      makePlayer({ id: 'sg-x', positions: ['SG'], isXPlayer: true, baseSalary: 200, currentSalary: 150 }),
+      makePlayer({ id: 'sf-1', positions: ['SF'], baseSalary: 100, currentSalary: 100 }),
+      makePlayer({ id: 'sf-x', positions: ['SF'], isXPlayer: true, baseSalary: 150, currentSalary: 400 }),
+      makePlayer({ id: 'pf-1', positions: ['PF'], baseSalary: 100, currentSalary: 100 }),
+      makePlayer({ id: 'pf-x', positions: ['PF'], isXPlayer: true, baseSalary: 200, currentSalary: 150 }),
+      makePlayer({ id: 'c-1', positions: ['C'], baseSalary: 100, currentSalary: 100 }),
+      makePlayer({ id: 'c-x', positions: ['C'], isXPlayer: true, baseSalary: 200, currentSalary: 150 }),
     ]
 
     const result = findBestLineup(players, 600)
@@ -48,10 +48,10 @@ describe('findBestLineup', () => {
 
   it('reports missing_position when a position has no eligible players at all', () => {
     const players: Player[] = [
-      makePlayer({ id: 'sg-1', position: 'SG' }),
-      makePlayer({ id: 'sf-1', position: 'SF' }),
-      makePlayer({ id: 'pf-1', position: 'PF' }),
-      makePlayer({ id: 'c-1', position: 'C' }),
+      makePlayer({ id: 'sg-1', positions: ['SG'] }),
+      makePlayer({ id: 'sf-1', positions: ['SF'] }),
+      makePlayer({ id: 'pf-1', positions: ['PF'] }),
+      makePlayer({ id: 'c-1', positions: ['C'] }),
     ]
 
     const result = findBestLineup(players, 1000)
@@ -64,11 +64,11 @@ describe('findBestLineup', () => {
 
   it('reports no_valid_x_slot when the pool has no X Players at all', () => {
     const players: Player[] = [
-      makePlayer({ id: 'pg-1', position: 'PG' }),
-      makePlayer({ id: 'sg-1', position: 'SG' }),
-      makePlayer({ id: 'sf-1', position: 'SF' }),
-      makePlayer({ id: 'pf-1', position: 'PF' }),
-      makePlayer({ id: 'c-1', position: 'C' }),
+      makePlayer({ id: 'pg-1', positions: ['PG'] }),
+      makePlayer({ id: 'sg-1', positions: ['SG'] }),
+      makePlayer({ id: 'sf-1', positions: ['SF'] }),
+      makePlayer({ id: 'pf-1', positions: ['PF'] }),
+      makePlayer({ id: 'c-1', positions: ['C'] }),
     ]
 
     const result = findBestLineup(players, 1000)
@@ -82,11 +82,11 @@ describe('findBestLineup', () => {
 
   it('reports no_valid_x_slot when two positions have no regular player, forcing a conflict', () => {
     const players: Player[] = [
-      makePlayer({ id: 'pg-x', position: 'PG', isXPlayer: true }),
-      makePlayer({ id: 'sg-x', position: 'SG', isXPlayer: true }),
-      makePlayer({ id: 'sf-1', position: 'SF' }),
-      makePlayer({ id: 'pf-1', position: 'PF' }),
-      makePlayer({ id: 'c-1', position: 'C' }),
+      makePlayer({ id: 'pg-x', positions: ['PG'], isXPlayer: true }),
+      makePlayer({ id: 'sg-x', positions: ['SG'], isXPlayer: true }),
+      makePlayer({ id: 'sf-1', positions: ['SF'] }),
+      makePlayer({ id: 'pf-1', positions: ['PF'] }),
+      makePlayer({ id: 'c-1', positions: ['C'] }),
     ]
 
     const result = findBestLineup(players, 1000)
@@ -100,16 +100,16 @@ describe('findBestLineup', () => {
 
   it('reports cap_too_low with the closest valid (exactly-one-X) lineup when nothing fits', () => {
     const players: Player[] = [
-      makePlayer({ id: 'pg-1', position: 'PG', baseSalary: 200, currentSalary: 200 }),
-      makePlayer({ id: 'pg-x', position: 'PG', isXPlayer: true, baseSalary: 300, currentSalary: 300 }),
-      makePlayer({ id: 'sg-1', position: 'SG', baseSalary: 200, currentSalary: 200 }),
-      makePlayer({ id: 'sg-x', position: 'SG', isXPlayer: true, baseSalary: 300, currentSalary: 300 }),
-      makePlayer({ id: 'sf-1', position: 'SF', baseSalary: 200, currentSalary: 200 }),
-      makePlayer({ id: 'sf-x', position: 'SF', isXPlayer: true, baseSalary: 100, currentSalary: 100 }),
-      makePlayer({ id: 'pf-1', position: 'PF', baseSalary: 200, currentSalary: 200 }),
-      makePlayer({ id: 'pf-x', position: 'PF', isXPlayer: true, baseSalary: 300, currentSalary: 300 }),
-      makePlayer({ id: 'c-1', position: 'C', baseSalary: 200, currentSalary: 200 }),
-      makePlayer({ id: 'c-x', position: 'C', isXPlayer: true, baseSalary: 300, currentSalary: 300 }),
+      makePlayer({ id: 'pg-1', positions: ['PG'], baseSalary: 200, currentSalary: 200 }),
+      makePlayer({ id: 'pg-x', positions: ['PG'], isXPlayer: true, baseSalary: 300, currentSalary: 300 }),
+      makePlayer({ id: 'sg-1', positions: ['SG'], baseSalary: 200, currentSalary: 200 }),
+      makePlayer({ id: 'sg-x', positions: ['SG'], isXPlayer: true, baseSalary: 300, currentSalary: 300 }),
+      makePlayer({ id: 'sf-1', positions: ['SF'], baseSalary: 200, currentSalary: 200 }),
+      makePlayer({ id: 'sf-x', positions: ['SF'], isXPlayer: true, baseSalary: 100, currentSalary: 100 }),
+      makePlayer({ id: 'pf-1', positions: ['PF'], baseSalary: 200, currentSalary: 200 }),
+      makePlayer({ id: 'pf-x', positions: ['PF'], isXPlayer: true, baseSalary: 300, currentSalary: 300 }),
+      makePlayer({ id: 'c-1', positions: ['C'], baseSalary: 200, currentSalary: 200 }),
+      makePlayer({ id: 'c-x', positions: ['C'], isXPlayer: true, baseSalary: 300, currentSalary: 300 }),
     ]
 
     const result = findBestLineup(players, 700)
@@ -126,12 +126,12 @@ describe('findBestLineup', () => {
 
   it('breaks ties in a regular slot by preferring lower cost, once the X slot is forced', () => {
     const players: Player[] = [
-      makePlayer({ id: 'pg-x', position: 'PG', isXPlayer: true, baseSalary: 999, currentSalary: 999 }),
-      makePlayer({ id: 'sg-a', position: 'SG', baseSalary: 100, currentSalary: 100 }),
-      makePlayer({ id: 'sg-b', position: 'SG', baseSalary: 80, currentSalary: 100 }),
-      makePlayer({ id: 'sf-1', position: 'SF', baseSalary: 50, currentSalary: 50 }),
-      makePlayer({ id: 'pf-1', position: 'PF', baseSalary: 50, currentSalary: 50 }),
-      makePlayer({ id: 'c-1', position: 'C', baseSalary: 50, currentSalary: 50 }),
+      makePlayer({ id: 'pg-x', positions: ['PG'], isXPlayer: true, baseSalary: 999, currentSalary: 999 }),
+      makePlayer({ id: 'sg-a', positions: ['SG'], baseSalary: 100, currentSalary: 100 }),
+      makePlayer({ id: 'sg-b', positions: ['SG'], baseSalary: 80, currentSalary: 100 }),
+      makePlayer({ id: 'sf-1', positions: ['SF'], baseSalary: 50, currentSalary: 50 }),
+      makePlayer({ id: 'pf-1', positions: ['PF'], baseSalary: 50, currentSalary: 50 }),
+      makePlayer({ id: 'c-1', positions: ['C'], baseSalary: 50, currentSalary: 50 }),
     ]
 
     const result = findBestLineup(players, 1250)
@@ -141,5 +141,65 @@ describe('findBestLineup', () => {
     expect(result.slots.find((s) => s.position === 'PG')?.player.id).toBe('pg-x')
     expect(result.slots.find((s) => s.position === 'SG')?.player.id).toBe('sg-b')
     expect(result.totalBaseSalary).toBe(1229)
+  })
+
+  it('assigns a shared multi-position player to the slot that has no other candidate', () => {
+    const players: Player[] = [
+      makePlayer({ id: 'pg-x', positions: ['PG'], isXPlayer: true, baseSalary: 100, currentSalary: 100 }),
+      makePlayer({ id: 'sg-1', positions: ['SG'], baseSalary: 100, currentSalary: 100 }),
+      // Only candidate for PF; also eligible for SF, where sf-cheap is the fallback.
+      makePlayer({ id: 'flex', positions: ['SF', 'PF'], baseSalary: 100, currentSalary: 500 }),
+      makePlayer({ id: 'sf-cheap', positions: ['SF'], baseSalary: 50, currentSalary: 50 }),
+      makePlayer({ id: 'c-1', positions: ['C'], baseSalary: 100, currentSalary: 100 }),
+    ]
+
+    const result = findBestLineup(players, 1000)
+
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.slots.find((s) => s.position === 'PF')?.player.id).toBe('flex')
+    expect(result.slots.find((s) => s.position === 'SF')?.player.id).toBe('sf-cheap')
+    expect(result.totalCurrentSalary).toBe(850)
+    expect(result.totalBaseSalary).toBe(450)
+  })
+
+  it('never places the same shared player into two slots at once', () => {
+    const players: Player[] = [
+      makePlayer({ id: 'pg-x', positions: ['PG'], isXPlayer: true, baseSalary: 100, currentSalary: 100 }),
+      // Best candidate at both SG and SF, but can only fill one.
+      makePlayer({ id: 'flex', positions: ['SG', 'SF'], baseSalary: 100, currentSalary: 300 }),
+      makePlayer({ id: 'sg-alt', positions: ['SG'], baseSalary: 100, currentSalary: 150 }),
+      makePlayer({ id: 'sf-alt', positions: ['SF'], baseSalary: 100, currentSalary: 150 }),
+      makePlayer({ id: 'pf-1', positions: ['PF'], baseSalary: 100, currentSalary: 100 }),
+      makePlayer({ id: 'c-1', positions: ['C'], baseSalary: 100, currentSalary: 100 }),
+    ]
+
+    const result = findBestLineup(players, 1000)
+
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.slots.filter((s) => s.player.id === 'flex')).toHaveLength(1)
+    expect(result.totalCurrentSalary).toBe(750)
+    expect(result.totalBaseSalary).toBe(500)
+  })
+
+  it('keeps exactly one X Player even when the best X candidate is eligible at multiple positions', () => {
+    const players: Player[] = [
+      makePlayer({ id: 'pg-1', positions: ['PG'], baseSalary: 100, currentSalary: 100 }),
+      makePlayer({ id: 'x-flex', positions: ['SG', 'SF'], isXPlayer: true, baseSalary: 100, currentSalary: 400 }),
+      makePlayer({ id: 'sg-1', positions: ['SG'], baseSalary: 100, currentSalary: 100 }),
+      makePlayer({ id: 'sf-1', positions: ['SF'], baseSalary: 100, currentSalary: 100 }),
+      makePlayer({ id: 'pf-1', positions: ['PF'], baseSalary: 100, currentSalary: 100 }),
+      makePlayer({ id: 'c-1', positions: ['C'], baseSalary: 100, currentSalary: 100 }),
+    ]
+
+    const result = findBestLineup(players, 1000)
+
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.slots.filter((s) => s.player.isXPlayer)).toHaveLength(1)
+    expect(result.slots.filter((s) => s.player.id === 'x-flex')).toHaveLength(1)
+    expect(result.totalCurrentSalary).toBe(800)
+    expect(result.totalBaseSalary).toBe(500)
   })
 })
