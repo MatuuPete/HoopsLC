@@ -147,3 +147,11 @@ revoke execute on function apply_catalog_import(jsonb) from anon;
 -- link.
 -- alter table players add constraint regular_player_has_catalog_link
 --   check (is_x_player or catalog_player_id is not null);
+
+-- Support multiple eligible positions per player
+alter table players drop column position;
+alter table players add column positions text[] not null;
+alter table players add constraint players_positions_valid check (
+  array_length(positions, 1) > 0
+  and positions <@ array['PG','SG','SF','PF','C']
+);
