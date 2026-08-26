@@ -1,4 +1,4 @@
-# HoopsLC — Lineup Optimizer
+# Six Man — Lineup Optimizer
 
 A dark, terminal-styled web app for picking the best 5-player basketball
 lineup (PG/SG/SF/PF/C) from the players you own, maximizing total power
@@ -47,11 +47,10 @@ npm install
 npm run dev
 ```
 
-Open the printed local URL. You'll be redirected to the login page —
-sign up with any email/password to create your account (Supabase's
-default project settings do not require email confirmation for new
-projects created for development; if your project has confirmation
-enabled, check your inbox).
+Open the printed local URL — you'll land on the public home page. Click
+"Sign In" and sign in with the account you created via Supabase
+Authentication → Users (self-service signup is disabled; accounts are
+created directly in the Supabase dashboard).
 
 ## Testing
 
@@ -66,8 +65,9 @@ Runs the Vitest suite (currently covers the lineup optimizer core).
 - `src/optimizer/` — pure lineup-optimization logic, fully unit tested.
 - `src/lib/supabaseClient.ts` — Supabase client setup.
 - `src/data/` — data-access modules and hooks wrapping Supabase queries.
-- `src/auth/` — authentication context, login page, route protection.
-- `src/pages/` — top-level pages (Players, Lineup Builder).
+- `src/auth/` — authentication context, login page, route protection,
+  and the public home route.
+- `src/pages/` — top-level pages (Home, Players, Lineup Builder).
 - `src/components/` — shared UI components (nav, layout, forms, tables).
 - `supabase/schema.sql` — database schema and RLS policies.
 
@@ -75,7 +75,7 @@ Runs the Vitest suite (currently covers the lineup optimizer core).
 
 After setup, verify the full flow works:
 
-1. Sign up a new account at `/login`.
+1. Sign in at `/login` (from the "Sign In" button on the home page).
 2. As an admin, go to `/admin/catalog`, paste a JSON batch of
    `{ name, positions, price, offense, defense }` rows, click Preview,
    review the diff, and click Confirm Import.

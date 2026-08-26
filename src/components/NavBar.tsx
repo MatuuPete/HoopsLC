@@ -1,5 +1,6 @@
-import { NavLink } from 'react-router-dom'
+import { Link, NavLink } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
+import { Logo } from './Logo'
 
 const baseLinks = [
   { to: '/players', label: 'Players' },
@@ -12,7 +13,10 @@ export function NavBar() {
 
   return (
     <nav className="flex items-center justify-between border-b border-border px-6 py-4">
-      <span className="text-sm uppercase tracking-widest font-bold">HoopsLC</span>
+      <Link to="/" className="flex items-center gap-2 text-sm uppercase tracking-widest font-bold">
+        <Logo className="w-5 h-5 text-text" />
+        Six Man
+      </Link>
       <div className="flex items-center gap-6">
         {links.map((link) => (
           <NavLink
