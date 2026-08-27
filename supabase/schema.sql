@@ -162,3 +162,9 @@ alter table settings add column objective_mode text not null default 'power'
   check (objective_mode in ('power', 'stats'));
 alter table settings add column offense_weight numeric not null default 0.5
   check (offense_weight >= 0 and offense_weight <= 1);
+
+-- Unavailable players: owned players whose copies are all committed to
+-- other accounts' lineups, so this calculation must not use them. Like
+-- required_player_ids, no array-element FK -- the app drops ids that no
+-- longer match an owned player before running the optimizer.
+alter table settings add column unavailable_player_ids uuid[] not null default '{}';

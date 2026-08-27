@@ -6,6 +6,7 @@ const DEFAULT_CAP = 3000
 interface Settings {
   salaryCap: number
   requiredPlayerIds: string[]
+  unavailablePlayerIds: string[]
   objectiveMode: ObjectiveMode
   offenseWeight: number
 }
@@ -13,12 +14,13 @@ interface Settings {
 export async function getSettings(): Promise<Settings> {
   const { data, error } = await supabase
     .from('settings')
-    .select('salary_cap, required_player_ids, objective_mode, offense_weight')
+    .select('salary_cap, required_player_ids, unavailable_player_ids, objective_mode, offense_weight')
     .maybeSingle()
   if (error) throw error
   return {
     salaryCap: data?.salary_cap ?? DEFAULT_CAP,
     requiredPlayerIds: data?.required_player_ids ?? [],
+    unavailablePlayerIds: data?.unavailable_player_ids ?? [],
     objectiveMode: (data?.objective_mode as ObjectiveMode) ?? 'power',
     offenseWeight: data?.offense_weight ?? 0.5,
   }
@@ -33,6 +35,16 @@ export async function setRequiredPlayerIds(userId: string, requiredPlayerIds: st
   const { error } = await supabase
     .from('settings')
     .upsert({ user_id: userId, required_player_ids: requiredPlayerIds })
+  if (error) throw error
+}
+
+export async function setUnavailablePlayerIds(
+  userId: string,
+  unavailablePlayerIds: string[],
+): Promise<void> {
+  const { error } = await supabase
+    .from('settings')
+    .upsert({ user_id: userId, unavailable_player_ids: unavailablePlayerIds })
   if (error) throw error
 }
 

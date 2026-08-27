@@ -192,11 +192,65 @@ function buildSeed(
   return { mask, hasX, cell }
 }
 
-export function findBestLineup(
+/**
+ * A user can own several copies of the same catalog player, but a lineup
+ * may field each real player only once. Copies are value-equivalent —
+ * currentSalary/offense/defense are all catalog-driven — and differ only
+ * in baseSalary, so the cheapest copy dominates the rest. Keep exactly one
+ * copy per catalogPlayerId: the preferred copy if exactly one is preferred,
+ * otherwise the cheapest (tie-broken by id). Two preferred copies of the
+ * same player is an impossible lineup. Players with no catalog link
+ * (X Players, unlinked rows) are always kept as-is.
+ */
+function dedupeCatalogCopies(
   players: Player[],
+  requiredPlayerIds: string[],
+): { ok: true; players: Player[] } | { ok: false; conflictingPlayerIds: string[] } {
+  const groups = new Map<string, Player[]>()
+  const kept: Player[] = []
+  for (const player of players) {
+    if (player.catalogPlayerId === null) {
+      kept.push(player)
+      continue
+    }
+    const group = groups.get(player.catalogPlayerId)
+    if (group) group.push(player)
+    else groups.set(player.catalogPlayerId, [player])
+  }
+
+  for (const group of groups.values()) {
+    const preferred = group.filter((p) => requiredPlayerIds.includes(p.id))
+    if (preferred.length > 1) {
+      return { ok: false, conflictingPlayerIds: preferred.map((p) => p.id) }
+    }
+    if (preferred.length === 1) {
+      kept.push(preferred[0])
+      continue
+    }
+    kept.push(
+      [...group].sort((a, b) => a.baseSalary - b.baseSalary || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))[0],
+    )
+  }
+
+  return { ok: true, players: kept }
+}
+
+export function findBestLineup(
+  allPlayers: Player[],
   salaryCap: number,
   preferences: LineupPreferences,
 ): LineupResult {
+  const available = allPlayers.filter((p) => !preferences.unavailablePlayerIds.includes(p.id))
+  const deduped = dedupeCatalogCopies(available, preferences.requiredPlayerIds)
+  if (!deduped.ok) {
+    return {
+      success: false,
+      reason: 'required_players_conflict',
+      conflictingPlayerIds: deduped.conflictingPlayerIds,
+    }
+  }
+  const players = deduped.players
+
   const missingPositions = POSITIONS.filter(
     (position) => !players.some((player) => player.positions.includes(position)),
   )

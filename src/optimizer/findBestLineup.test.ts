@@ -4,6 +4,7 @@ import type { LineupPreferences, Player } from './types'
 
 const DEFAULT_PREFERENCES: LineupPreferences = {
   requiredPlayerIds: [],
+  unavailablePlayerIds: [],
   objectiveMode: 'power',
   offenseWeight: 0.5,
 }
@@ -224,6 +225,134 @@ describe('findBestLineup', () => {
     expect(result.slots.find((s) => s.position === 'SG')?.player.id).toBe('sg-required')
   })
 
+  it('leaves an unavailable player out even when they are the best pick for their slot', () => {
+    const players: Player[] = [
+      makePlayer({ id: 'pg-x', positions: ['PG'], isXPlayer: true, baseSalary: 100, currentSalary: 100 }),
+      makePlayer({ id: 'sg-best', positions: ['SG'], baseSalary: 100, currentSalary: 300 }),
+      makePlayer({ id: 'sg-next', positions: ['SG'], baseSalary: 100, currentSalary: 150 }),
+      makePlayer({ id: 'sf-1', positions: ['SF'], baseSalary: 100, currentSalary: 100 }),
+      makePlayer({ id: 'pf-1', positions: ['PF'], baseSalary: 100, currentSalary: 100 }),
+      makePlayer({ id: 'c-1', positions: ['C'], baseSalary: 100, currentSalary: 100 }),
+    ]
+
+    const result = findBestLineup(players, 1000, {
+      ...DEFAULT_PREFERENCES,
+      unavailablePlayerIds: ['sg-best'],
+    })
+
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.slots.find((s) => s.position === 'SG')?.player.id).toBe('sg-next')
+  })
+
+  it('reports missing_position when every candidate for a position is unavailable', () => {
+    const players: Player[] = [
+      makePlayer({ id: 'pg-x', positions: ['PG'], isXPlayer: true }),
+      makePlayer({ id: 'sg-1', positions: ['SG'] }),
+      makePlayer({ id: 'sf-1', positions: ['SF'] }),
+      makePlayer({ id: 'pf-1', positions: ['PF'] }),
+      makePlayer({ id: 'c-1', positions: ['C'] }),
+      makePlayer({ id: 'c-2', positions: ['C'] }),
+    ]
+
+    const result = findBestLineup(players, 1000, {
+      ...DEFAULT_PREFERENCES,
+      unavailablePlayerIds: ['c-1', 'c-2'],
+    })
+
+    expect(result.success).toBe(false)
+    if (result.success) return
+    if (result.reason !== 'missing_position') throw new Error('expected missing_position')
+    expect(result.missingPositions).toEqual(['C'])
+  })
+
+  it('never fields two copies of the same catalog player, keeping the cheaper copy', () => {
+    const players: Player[] = [
+      makePlayer({ id: 'pg-x', positions: ['PG'], isXPlayer: true, baseSalary: 100, currentSalary: 100 }),
+      makePlayer({ id: 'star-cheap', positions: ['SG', 'SF'], catalogPlayerId: 'cat-1', baseSalary: 100, currentSalary: 500 }),
+      makePlayer({ id: 'star-exp', positions: ['SG', 'SF'], catalogPlayerId: 'cat-1', baseSalary: 300, currentSalary: 500 }),
+      makePlayer({ id: 'sf-1', positions: ['SF'], baseSalary: 100, currentSalary: 100 }),
+      makePlayer({ id: 'pf-1', positions: ['PF'], baseSalary: 100, currentSalary: 100 }),
+      makePlayer({ id: 'c-1', positions: ['C'], baseSalary: 100, currentSalary: 100 }),
+    ]
+
+    const result = findBestLineup(players, 1000, DEFAULT_PREFERENCES)
+
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    const catalogIds = result.slots.map((s) => s.player.catalogPlayerId).filter((id) => id !== null)
+    expect(new Set(catalogIds).size).toBe(catalogIds.length)
+    expect(result.slots.find((s) => s.position === 'SG')?.player.id).toBe('star-cheap')
+    expect(result.slots.find((s) => s.position === 'SF')?.player.id).toBe('sf-1')
+  })
+
+  it('dedupes among still-available copies after removing unavailable ones', () => {
+    const players: Player[] = [
+      makePlayer({ id: 'pg-x', positions: ['PG'], isXPlayer: true, baseSalary: 100, currentSalary: 100 }),
+      makePlayer({ id: 'star-cheap', positions: ['SG', 'SF'], catalogPlayerId: 'cat-1', baseSalary: 50, currentSalary: 500 }),
+      makePlayer({ id: 'star-mid', positions: ['SG', 'SF'], catalogPlayerId: 'cat-1', baseSalary: 100, currentSalary: 500 }),
+      makePlayer({ id: 'star-exp', positions: ['SG', 'SF'], catalogPlayerId: 'cat-1', baseSalary: 300, currentSalary: 500 }),
+      makePlayer({ id: 'sf-1', positions: ['SF'], baseSalary: 100, currentSalary: 100 }),
+      makePlayer({ id: 'pf-1', positions: ['PF'], baseSalary: 100, currentSalary: 100 }),
+      makePlayer({ id: 'c-1', positions: ['C'], baseSalary: 100, currentSalary: 100 }),
+    ]
+
+    const result = findBestLineup(players, 1000, {
+      ...DEFAULT_PREFERENCES,
+      unavailablePlayerIds: ['star-cheap'],
+    })
+
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    const catalogIds = result.slots.map((s) => s.player.catalogPlayerId).filter((id) => id !== null)
+    expect(new Set(catalogIds).size).toBe(catalogIds.length)
+    expect(result.slots.find((s) => s.position === 'SG')?.player.id).toBe('star-mid')
+  })
+
+  it('keeps only the preferred copy when another copy of that player is cheaper', () => {
+    const players: Player[] = [
+      makePlayer({ id: 'pg-x', positions: ['PG'], isXPlayer: true, baseSalary: 100, currentSalary: 100 }),
+      makePlayer({ id: 'star-cheap', positions: ['SG', 'SF'], catalogPlayerId: 'cat-1', baseSalary: 100, currentSalary: 500 }),
+      makePlayer({ id: 'star-exp', positions: ['SG', 'SF'], catalogPlayerId: 'cat-1', baseSalary: 300, currentSalary: 500 }),
+      makePlayer({ id: 'sf-1', positions: ['SF'], baseSalary: 100, currentSalary: 100 }),
+      makePlayer({ id: 'pf-1', positions: ['PF'], baseSalary: 100, currentSalary: 100 }),
+      makePlayer({ id: 'c-1', positions: ['C'], baseSalary: 100, currentSalary: 100 }),
+    ]
+
+    const result = findBestLineup(players, 1000, {
+      ...DEFAULT_PREFERENCES,
+      requiredPlayerIds: ['star-exp'],
+    })
+
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    const catalogIds = result.slots.map((s) => s.player.catalogPlayerId).filter((id) => id !== null)
+    expect(new Set(catalogIds).size).toBe(catalogIds.length)
+    expect(result.slots.map((s) => s.player.id)).toContain('star-exp')
+    expect(result.slots.map((s) => s.player.id)).not.toContain('star-cheap')
+  })
+
+  it('reports required_players_conflict when two copies of the same player are both preferred', () => {
+    const players: Player[] = [
+      makePlayer({ id: 'pg-x', positions: ['PG'], isXPlayer: true }),
+      makePlayer({ id: 'star-a', positions: ['SG', 'SF'], catalogPlayerId: 'cat-1' }),
+      makePlayer({ id: 'star-b', positions: ['SG', 'SF'], catalogPlayerId: 'cat-1' }),
+      makePlayer({ id: 'sf-1', positions: ['SF'] }),
+      makePlayer({ id: 'pf-1', positions: ['PF'] }),
+      makePlayer({ id: 'c-1', positions: ['C'] }),
+    ]
+
+    const result = findBestLineup(players, 1000, {
+      ...DEFAULT_PREFERENCES,
+      requiredPlayerIds: ['star-a', 'star-b'],
+    })
+
+    expect(result.success).toBe(false)
+    if (result.success) return
+    if (result.reason !== 'required_players_conflict') throw new Error('expected required_players_conflict')
+    expect(result.conflictingPlayerIds).toEqual(expect.arrayContaining(['star-a', 'star-b']))
+  })
+
   it('reports required_players_conflict when two required players share their only eligible position', () => {
     const players: Player[] = [
       makePlayer({ id: 'pg-x', positions: ['PG'], isXPlayer: true }),
@@ -313,6 +442,7 @@ describe('findBestLineup', () => {
 
     const result = findBestLineup(players, 1000, {
       requiredPlayerIds: [],
+      unavailablePlayerIds: [],
       objectiveMode: 'stats',
       offenseWeight: 1,
     })
@@ -349,6 +479,7 @@ describe('findBestLineup', () => {
 
     const result = findBestLineup(players, 1000, {
       requiredPlayerIds: [],
+      unavailablePlayerIds: [],
       objectiveMode: 'stats',
       offenseWeight: 0,
     })
@@ -392,6 +523,7 @@ describe('findBestLineup', () => {
 
     const result = findBestLineup(players, 1000, {
       requiredPlayerIds: [],
+      unavailablePlayerIds: [],
       objectiveMode: 'stats',
       offenseWeight: 0.5,
     })

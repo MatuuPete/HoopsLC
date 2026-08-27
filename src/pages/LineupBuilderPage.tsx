@@ -4,6 +4,7 @@ import { useSettings } from '../data/useSettings'
 import { findBestLineup } from '../optimizer/findBestLineup'
 import type { LineupResult } from '../optimizer/types'
 import { LineupResultPanel } from '../components/LineupResultPanel'
+import { PlayerChecklist } from '../components/PlayerChecklist'
 
 export function LineupBuilderPage() {
   const { players } = usePlayers()
@@ -12,6 +13,8 @@ export function LineupBuilderPage() {
     updateSalaryCap,
     requiredPlayerIds,
     updateRequiredPlayerIds,
+    unavailablePlayerIds,
+    updateUnavailablePlayerIds,
     objectiveMode,
     updateObjectiveMode,
     offenseWeight,
@@ -20,13 +23,21 @@ export function LineupBuilderPage() {
   const [capInput, setCapInput] = useState(salaryCap)
   const [result, setResult] = useState<LineupResult | null>(null)
   const [preferredSearch, setPreferredSearch] = useState('')
+  const [unavailableSearch, setUnavailableSearch] = useState('')
 
   useEffect(() => {
     setCapInput(salaryCap)
   }, [salaryCap])
 
   function handleCalculate() {
-    setResult(findBestLineup(players, capInput, { requiredPlayerIds, objectiveMode, offenseWeight }))
+    setResult(
+      findBestLineup(players, capInput, {
+        requiredPlayerIds,
+        unavailablePlayerIds,
+        objectiveMode,
+        offenseWeight,
+      }),
+    )
   }
 
   async function handleCapChange(value: number) {
@@ -39,11 +50,20 @@ export function LineupBuilderPage() {
       ? requiredPlayerIds.filter((id) => id !== playerId)
       : [...requiredPlayerIds, playerId]
     updateRequiredPlayerIds(next)
+    if (!requiredPlayerIds.includes(playerId) && unavailablePlayerIds.includes(playerId)) {
+      updateUnavailablePlayerIds(unavailablePlayerIds.filter((id) => id !== playerId))
+    }
   }
 
-  const filteredPlayers = players.filter((p) =>
-    p.name.toLowerCase().includes(preferredSearch.toLowerCase()),
-  )
+  function toggleUnavailable(playerId: string) {
+    const next = unavailablePlayerIds.includes(playerId)
+      ? unavailablePlayerIds.filter((id) => id !== playerId)
+      : [...unavailablePlayerIds, playerId]
+    updateUnavailablePlayerIds(next)
+    if (!unavailablePlayerIds.includes(playerId) && requiredPlayerIds.includes(playerId)) {
+      updateRequiredPlayerIds(requiredPlayerIds.filter((id) => id !== playerId))
+    }
+  }
 
   return (
     <div className="flex flex-col gap-4 p-6 max-w-md">
@@ -59,31 +79,23 @@ export function LineupBuilderPage() {
         />
       </label>
 
-      <div className="flex flex-col gap-1 text-xs uppercase tracking-widest text-muted">
-        Preferred Players
-        <input
-          className="bg-bg border border-border px-2 py-1 text-text normal-case tracking-normal text-sm"
-          placeholder="Search player..."
-          value={preferredSearch}
-          onChange={(e) => setPreferredSearch(e.target.value)}
-        />
-        <div className="border border-border bg-panel p-2 flex flex-col gap-1 max-h-48 overflow-y-auto">
-          {players.length === 0 && <span className="text-muted normal-case">No owned players yet.</span>}
-          {players.length > 0 && filteredPlayers.length === 0 && (
-            <span className="text-muted normal-case">No players match "{preferredSearch}".</span>
-          )}
-          {filteredPlayers.map((p) => (
-            <label key={p.id} className="flex items-center gap-2 normal-case tracking-normal text-text text-sm">
-              <input
-                type="checkbox"
-                checked={requiredPlayerIds.includes(p.id)}
-                onChange={() => toggleRequired(p.id)}
-              />
-              {p.name} ({p.positions.join('/')})
-            </label>
-          ))}
-        </div>
-      </div>
+      <PlayerChecklist
+        label="Preferred Players"
+        players={players}
+        selectedIds={requiredPlayerIds}
+        search={preferredSearch}
+        onSearchChange={setPreferredSearch}
+        onToggle={toggleRequired}
+      />
+
+      <PlayerChecklist
+        label="Unavailable Players"
+        players={players}
+        selectedIds={unavailablePlayerIds}
+        search={unavailableSearch}
+        onSearchChange={setUnavailableSearch}
+        onToggle={toggleUnavailable}
+      />
 
       <div className="flex flex-col gap-2 text-xs uppercase tracking-widest text-muted">
         Objective

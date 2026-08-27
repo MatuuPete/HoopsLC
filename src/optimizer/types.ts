@@ -23,6 +23,7 @@ export type ObjectiveMode = 'power' | 'stats'
 
 export interface LineupPreferences {
   requiredPlayerIds: string[]
+  unavailablePlayerIds: string[]
   objectiveMode: ObjectiveMode
   offenseWeight: number
 }

@@ -5,6 +5,7 @@ import {
   setOffenseWeight,
   setRequiredPlayerIds,
   setSalaryCap,
+  setUnavailablePlayerIds,
 } from './settingsApi'
 import type { ObjectiveMode } from '../optimizer/types'
 import { useAuth } from '../auth/AuthContext'
@@ -13,6 +14,7 @@ export function useSettings() {
   const { session } = useAuth()
   const [salaryCap, setSalaryCapState] = useState(3000)
   const [requiredPlayerIds, setRequiredPlayerIdsState] = useState<string[]>([])
+  const [unavailablePlayerIds, setUnavailablePlayerIdsState] = useState<string[]>([])
   const [objectiveMode, setObjectiveModeState] = useState<ObjectiveMode>('power')
   const [offenseWeight, setOffenseWeightState] = useState(0.5)
   const [loading, setLoading] = useState(true)
@@ -22,6 +24,7 @@ export function useSettings() {
     const settings = await getSettings()
     setSalaryCapState(settings.salaryCap)
     setRequiredPlayerIdsState(settings.requiredPlayerIds)
+    setUnavailablePlayerIdsState(settings.unavailablePlayerIds)
     setObjectiveModeState(settings.objectiveMode)
     setOffenseWeightState(settings.offenseWeight)
     setLoading(false)
@@ -43,6 +46,12 @@ export function useSettings() {
     setRequiredPlayerIdsState(value)
   }
 
+  async function updateUnavailablePlayerIds(value: string[]) {
+    if (!session) return
+    await setUnavailablePlayerIds(session.user.id, value)
+    setUnavailablePlayerIdsState(value)
+  }
+
   async function updateObjectiveMode(value: ObjectiveMode) {
     if (!session) return
     await setObjectiveMode(session.user.id, value)
@@ -58,11 +67,13 @@ export function useSettings() {
   return {
     salaryCap,
     requiredPlayerIds,
+    unavailablePlayerIds,
     objectiveMode,
     offenseWeight,
     loading,
     updateSalaryCap,
     updateRequiredPlayerIds,
+    updateUnavailablePlayerIds,
     updateObjectiveMode,
     updateOffenseWeight,
   }
