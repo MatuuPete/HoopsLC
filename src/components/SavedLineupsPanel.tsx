@@ -49,7 +49,7 @@ function SavedLineupCard({
   }
 
   return (
-    <div className="border border-border bg-panel p-4 flex flex-col gap-3">
+    <div className="border border-border bg-panel p-3 flex flex-col gap-2">
       <div className="flex justify-between items-start gap-2">
         <div className="flex flex-col gap-0.5 min-w-0">
           {editing ? (
@@ -126,7 +126,7 @@ export function SavedLineupsPanel({ lineups, error, onRename, onDelete }: SavedL
 
       {lineups.length === 0 && !error && <p className="text-muted text-sm">No saved lineups yet.</p>}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 items-start">
         {lineups.map((lineup) => (
           <SavedLineupCard key={lineup.id} lineup={lineup} onRename={onRename} onDelete={onDelete} />
         ))}
