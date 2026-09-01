@@ -8,6 +8,10 @@ function sumDefense(slots: LineupSlot[]): number {
   return slots.reduce((sum, slot) => sum + slot.player.defense, 0)
 }
 
+function sumStatPower(slots: LineupSlot[]): number {
+  return slots.reduce((sum, slot) => sum + slot.player.offense + slot.player.defense, 0)
+}
+
 interface LineupResultPanelProps {
   result: LineupResult | null
   players: Player[]
@@ -67,8 +71,12 @@ export function LineupResultPanel({ result, players }: LineupResultPanelProps) {
           <span>{result.cheapestPossibleBaseSalary}</span>
         </div>
         <div className="flex justify-between text-xs uppercase tracking-widest text-muted">
-          <span>Closest Total Power</span>
+          <span>Closest Total Power by Sal</span>
           <span>{result.closestTotalCurrentSalary}</span>
+        </div>
+        <div className="flex justify-between text-xs uppercase tracking-widest text-muted">
+          <span>Closest Total Power by Stats</span>
+          <span>{sumStatPower(result.closestLineup)}</span>
         </div>
         <div className="flex justify-between text-xs uppercase tracking-widest text-muted">
           <span>Closest Total Offense</span>
@@ -101,8 +109,12 @@ export function LineupResultPanel({ result, players }: LineupResultPanelProps) {
         <span>{result.totalBaseSalary}</span>
       </div>
       <div className="flex justify-between text-xs uppercase tracking-widest text-muted">
-        <span>Total Power</span>
+        <span>Total Power by Sal</span>
         <span>{result.totalCurrentSalary}</span>
+      </div>
+      <div className="flex justify-between text-xs uppercase tracking-widest text-muted">
+        <span>Total Power by Stats</span>
+        <span>{sumStatPower(result.slots)}</span>
       </div>
       <div className="flex justify-between text-xs uppercase tracking-widest text-muted">
         <span>Remaining Cap</span>
