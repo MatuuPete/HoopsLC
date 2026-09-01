@@ -19,6 +19,21 @@ export interface LineupSlot {
   player: Player
 }
 
+/**
+ * A point-in-time snapshot of one slot in a saved lineup. Values are copied
+ * from the player at save time so a saved lineup keeps rendering what it was
+ * even after catalog prices or stats change.
+ */
+export interface SavedLineupSlot {
+  position: Position
+  name: string
+  isXPlayer: boolean
+  currentSalary: number
+  baseSalary: number
+  offense: number
+  defense: number
+}
+
 export type ObjectiveMode = 'power' | 'stats'
 
 export interface LineupPreferences {

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { LineupResult, LineupSlot, Player } from '../optimizer/types'
 
 function sumOffense(slots: LineupSlot[]): number {
@@ -15,9 +16,40 @@ function sumStatPower(slots: LineupSlot[]): number {
 interface LineupResultPanelProps {
   result: LineupResult | null
   players: Player[]
+  onSave?: () => Promise<void>
 }
 
-export function LineupResultPanel({ result, players }: LineupResultPanelProps) {
+function SaveLineupButton({ onSave }: { onSave: () => Promise<void> }) {
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+
+  async function handleClick() {
+    setSaving(true)
+    setSaveError(null)
+    try {
+      await onSave()
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to save lineup')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="border-t border-border pt-3 flex flex-col gap-2">
+      <button
+        onClick={handleClick}
+        disabled={saving}
+        className="border border-border px-4 py-2 uppercase tracking-widest text-xs w-fit disabled:opacity-50"
+      >
+        {saving ? 'Saving...' : 'Save Lineup'}
+      </button>
+      {saveError && <p className="text-xs text-red-400">{saveError}</p>}
+    </div>
+  )
+}
+
+export function LineupResultPanel({ result, players, onSave }: LineupResultPanelProps) {
   if (!result) return null
 
   if (!result.success && result.reason === 'missing_position') {
@@ -128,6 +160,7 @@ export function LineupResultPanel({ result, players }: LineupResultPanelProps) {
         <span>Total Defense</span>
         <span>{sumDefense(result.slots)}</span>
       </div>
+      {onSave && <SaveLineupButton onSave={onSave} />}
     </div>
   )
 }

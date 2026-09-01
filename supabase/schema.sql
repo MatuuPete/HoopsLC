@@ -168,3 +168,20 @@ alter table settings add column offense_weight numeric not null default 0.5
 -- required_player_ids, no array-element FK -- the app drops ids that no
 -- longer match an owned player before running the optimizer.
 alter table settings add column unavailable_player_ids uuid[] not null default '{}';
+
+-- Saved lineups: a point-in-time snapshot of a calculated lineup. The five
+-- slots are stored denormalised in `slots` (position, name, isXPlayer,
+-- currentSalary, baseSalary, offense, defense) so a saved lineup keeps
+-- rendering what it was even after catalog prices or stats change. Card
+-- totals are summed from the snapshot on the client.
+create table lineups (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  slots jsonb not null
+);
+
+alter table lineups enable row level security;
+
+create policy "lineups_owner" on lineups
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
