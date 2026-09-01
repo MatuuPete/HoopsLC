@@ -20,7 +20,7 @@ function formatSavedAt(iso: string): string {
 
 export function SavedLineupsPanel({ lineups, error, onDelete }: SavedLineupsPanelProps) {
   return (
-    <div className="flex flex-col gap-4 flex-1">
+    <div className="flex flex-col gap-4 w-full max-w-xl">
       <h2 className="text-sm uppercase tracking-widest text-muted">Saved Lineups</h2>
 
       {error && <p className="text-red-400 text-sm">{error}</p>}
