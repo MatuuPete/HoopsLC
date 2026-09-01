@@ -119,16 +119,18 @@ function SavedLineupCard({
 
 export function SavedLineupsPanel({ lineups, error, onRename, onDelete }: SavedLineupsPanelProps) {
   return (
-    <div className="flex flex-col gap-4 w-full max-w-xl">
+    <div className="flex flex-col gap-4 flex-1">
       <h2 className="text-sm uppercase tracking-widest text-muted">Saved Lineups</h2>
 
       {error && <p className="text-red-400 text-sm">{error}</p>}
 
       {lineups.length === 0 && !error && <p className="text-muted text-sm">No saved lineups yet.</p>}
 
-      {lineups.map((lineup) => (
-        <SavedLineupCard key={lineup.id} lineup={lineup} onRename={onRename} onDelete={onDelete} />
-      ))}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+        {lineups.map((lineup) => (
+          <SavedLineupCard key={lineup.id} lineup={lineup} onRename={onRename} onDelete={onDelete} />
+        ))}
+      </div>
     </div>
   )
 }
