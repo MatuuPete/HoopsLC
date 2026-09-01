@@ -30,10 +30,14 @@ export function PlayersPage() {
     setMode({ kind: 'closed' })
   }
 
-  async function handleAddCatalogSubmit(player: CatalogPlayer, baseSalary: number) {
+  async function handleAddCatalogSubmit(
+    player: CatalogPlayer,
+    baseSalary: number,
+    positions: CatalogPlayer['positions'],
+  ) {
     await addPlayer({
       name: player.name,
-      positions: player.positions,
+      positions,
       isXPlayer: false,
       baseSalary,
       currentSalary: player.price,
@@ -44,10 +48,14 @@ export function PlayersPage() {
     setMode({ kind: 'closed' })
   }
 
-  async function handleEditCatalogSubmit(existing: Player, baseSalary: number) {
+  async function handleEditCatalogSubmit(
+    existing: Player,
+    baseSalary: number,
+    positions: Player['positions'],
+  ) {
     await editPlayer(existing.id, {
       name: existing.name,
-      positions: existing.positions,
+      positions,
       isXPlayer: false,
       baseSalary,
       currentSalary: existing.currentSalary,
@@ -97,7 +105,7 @@ export function PlayersPage() {
             price={mode.player.price}
             offense={mode.player.offense}
             defense={mode.player.defense}
-            onSubmit={(baseSalary) => handleAddCatalogSubmit(mode.player, baseSalary)}
+            onSubmit={(baseSalary, positions) => handleAddCatalogSubmit(mode.player, baseSalary, positions)}
             onCancel={() => setMode({ kind: 'closed' })}
           />
         )}
@@ -110,7 +118,7 @@ export function PlayersPage() {
             offense={mode.player.offense}
             defense={mode.player.defense}
             initialBaseSalary={mode.player.baseSalary}
-            onSubmit={(baseSalary) => handleEditCatalogSubmit(mode.player, baseSalary)}
+            onSubmit={(baseSalary, positions) => handleEditCatalogSubmit(mode.player, baseSalary, positions)}
             onCancel={() => setMode({ kind: 'closed' })}
           />
         )}
