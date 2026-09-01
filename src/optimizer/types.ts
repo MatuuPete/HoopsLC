@@ -26,6 +26,12 @@ export interface LineupSlot {
  */
 export interface SavedLineupSlot {
   position: Position
+  /**
+   * The owned player this slot was filled with. Used to lock that player out
+   * of future lineups. Optional only for back-compat with lineups saved
+   * before this field existed — those contribute nothing to the locked set.
+   */
+  playerId?: string
   name: string
   isXPlayer: boolean
   currentSalary: number

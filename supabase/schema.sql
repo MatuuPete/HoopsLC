@@ -191,3 +191,10 @@ create policy "lineups_owner" on lineups
 -- a lineup never reuses its number.
 alter table lineups add column title text not null default '';
 alter table settings add column saved_lineup_count integer not null default 0;
+
+-- Each saved-lineup slot object now also carries `playerId` (the owned
+-- player it was filled with). A player in any saved lineup is locked out
+-- of future lineup calculations, which replaced the manual "unavailable
+-- players" list -- settings.unavailable_player_ids is now vestigial and no
+-- longer read or written by the app. Slots saved before `playerId` existed
+-- lock nothing. No DDL: `slots` is jsonb.

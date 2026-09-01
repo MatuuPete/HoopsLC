@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { usePlayers } from '../data/usePlayers'
 import { useSettings } from '../data/useSettings'
 import { useLineups } from '../data/useLineups'
 import { findBestLineup } from '../optimizer/findBestLineup'
+import { lockedPlayerIds } from '../optimizer/lockedPlayerIds'
 import type { LineupResult } from '../optimizer/types'
 import { LineupResultPanel } from '../components/LineupResultPanel'
 import { SavedLineupsPanel } from '../components/SavedLineupsPanel'
@@ -15,8 +16,6 @@ export function LineupBuilderPage() {
     updateSalaryCap,
     requiredPlayerIds,
     updateRequiredPlayerIds,
-    unavailablePlayerIds,
-    updateUnavailablePlayerIds,
     objectiveMode,
     updateObjectiveMode,
     offenseWeight,
@@ -28,7 +27,22 @@ export function LineupBuilderPage() {
   const [capInput, setCapInput] = useState(salaryCap)
   const [result, setResult] = useState<LineupResult | null>(null)
   const [preferredSearch, setPreferredSearch] = useState('')
-  const [unavailableSearch, setUnavailableSearch] = useState('')
+
+  // Players already committed to a saved lineup are locked out of new ones.
+  const lockedIds = useMemo(() => lockedPlayerIds(lineups), [lineups])
+  const availablePlayers = useMemo(
+    () => players.filter((p) => !lockedIds.has(p.id)),
+    [players, lockedIds],
+  )
+  const committedNames = useMemo(() => {
+    const byId = new Map<string, string>()
+    for (const lineup of lineups) {
+      for (const slot of lineup.slots) {
+        if (slot.playerId) byId.set(slot.playerId, slot.name)
+      }
+    }
+    return [...byId.values()].sort()
+  }, [lineups])
 
   useEffect(() => {
     setCapInput(salaryCap)
@@ -38,7 +52,7 @@ export function LineupBuilderPage() {
     setResult(
       findBestLineup(players, capInput, {
         requiredPlayerIds,
-        unavailablePlayerIds,
+        unavailablePlayerIds: [...lockedIds],
         objectiveMode,
         offenseWeight,
       }),
@@ -51,6 +65,7 @@ export function LineupBuilderPage() {
     await saveLineup(
       result.slots.map((slot) => ({
         position: slot.position,
+        playerId: slot.player.id,
         name: slot.player.name,
         isXPlayer: slot.player.isXPlayer,
         currentSalary: slot.player.currentSalary,
@@ -73,19 +88,6 @@ export function LineupBuilderPage() {
       ? requiredPlayerIds.filter((id) => id !== playerId)
       : [...requiredPlayerIds, playerId]
     updateRequiredPlayerIds(next)
-    if (!requiredPlayerIds.includes(playerId) && unavailablePlayerIds.includes(playerId)) {
-      updateUnavailablePlayerIds(unavailablePlayerIds.filter((id) => id !== playerId))
-    }
-  }
-
-  function toggleUnavailable(playerId: string) {
-    const next = unavailablePlayerIds.includes(playerId)
-      ? unavailablePlayerIds.filter((id) => id !== playerId)
-      : [...unavailablePlayerIds, playerId]
-    updateUnavailablePlayerIds(next)
-    if (!unavailablePlayerIds.includes(playerId) && requiredPlayerIds.includes(playerId)) {
-      updateRequiredPlayerIds(requiredPlayerIds.filter((id) => id !== playerId))
-    }
   }
 
   return (
@@ -103,25 +105,22 @@ export function LineupBuilderPage() {
           />
         </label>
 
-        <PlayerChecklist
-          label="Preferred Players"
-          players={players}
-          selectedIds={requiredPlayerIds}
-          search={preferredSearch}
-          onSearchChange={setPreferredSearch}
-          onToggle={toggleRequired}
-          onClearAll={() => updateRequiredPlayerIds([])}
-        />
-
-        <PlayerChecklist
-          label="Unavailable Players"
-          players={players}
-          selectedIds={unavailablePlayerIds}
-          search={unavailableSearch}
-          onSearchChange={setUnavailableSearch}
-          onToggle={toggleUnavailable}
-          onClearAll={() => updateUnavailablePlayerIds([])}
-        />
+        <div className="flex flex-col gap-1">
+          <PlayerChecklist
+            label="Preferred Players"
+            players={availablePlayers}
+            selectedIds={requiredPlayerIds}
+            search={preferredSearch}
+            onSearchChange={setPreferredSearch}
+            onToggle={toggleRequired}
+            onClearAll={() => updateRequiredPlayerIds([])}
+          />
+          {committedNames.length > 0 && (
+            <p className="text-xs text-muted normal-case tracking-normal">
+              Committed to saved lineups: {committedNames.join(', ')}
+            </p>
+          )}
+        </div>
 
         <div className="flex flex-col gap-2 text-xs uppercase tracking-widest text-muted">
           Objective
