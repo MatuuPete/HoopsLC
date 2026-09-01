@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import { createLineup, deleteLineup, listLineups, type SavedLineup } from './lineupsApi'
+import {
+  createLineup,
+  deleteLineup,
+  listLineups,
+  updateLineupTitle,
+  type SavedLineup,
+} from './lineupsApi'
 import type { SavedLineupSlot } from '../optimizer/types'
 import { useAuth } from '../auth/AuthContext'
 
@@ -25,10 +31,15 @@ export function useLineups() {
     if (session) refresh()
   }, [session, refresh])
 
-  async function saveLineup(slots: SavedLineupSlot[]) {
+  async function saveLineup(slots: SavedLineupSlot[], title: string) {
     if (!session) return
-    const created = await createLineup(slots, session.user.id)
+    const created = await createLineup(slots, title, session.user.id)
     setLineups((prev) => [created, ...prev])
+  }
+
+  async function renameLineup(id: string, title: string) {
+    await updateLineupTitle(id, title)
+    setLineups((prev) => prev.map((lineup) => (lineup.id === id ? { ...lineup, title } : lineup)))
   }
 
   async function removeLineup(id: string) {
@@ -36,5 +47,5 @@ export function useLineups() {
     setLineups((prev) => prev.filter((lineup) => lineup.id !== id))
   }
 
-  return { lineups, loading, error, saveLineup, removeLineup, refresh }
+  return { lineups, loading, error, saveLineup, renameLineup, removeLineup, refresh }
 }

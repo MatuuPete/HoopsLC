@@ -5,6 +5,7 @@ import {
   setOffenseWeight,
   setRequiredPlayerIds,
   setSalaryCap,
+  setSavedLineupCount,
   setUnavailablePlayerIds,
 } from './settingsApi'
 import type { ObjectiveMode } from '../optimizer/types'
@@ -17,6 +18,7 @@ export function useSettings() {
   const [unavailablePlayerIds, setUnavailablePlayerIdsState] = useState<string[]>([])
   const [objectiveMode, setObjectiveModeState] = useState<ObjectiveMode>('power')
   const [offenseWeight, setOffenseWeightState] = useState(0.5)
+  const [savedLineupCount, setSavedLineupCountState] = useState(0)
   const [loading, setLoading] = useState(true)
 
   const refresh = useCallback(async () => {
@@ -27,6 +29,7 @@ export function useSettings() {
     setUnavailablePlayerIdsState(settings.unavailablePlayerIds)
     setObjectiveModeState(settings.objectiveMode)
     setOffenseWeightState(settings.offenseWeight)
+    setSavedLineupCountState(settings.savedLineupCount)
     setLoading(false)
   }, [])
 
@@ -64,17 +67,25 @@ export function useSettings() {
     setOffenseWeightState(value)
   }
 
+  async function updateSavedLineupCount(value: number) {
+    if (!session) return
+    await setSavedLineupCount(session.user.id, value)
+    setSavedLineupCountState(value)
+  }
+
   return {
     salaryCap,
     requiredPlayerIds,
     unavailablePlayerIds,
     objectiveMode,
     offenseWeight,
+    savedLineupCount,
     loading,
     updateSalaryCap,
     updateRequiredPlayerIds,
     updateUnavailablePlayerIds,
     updateObjectiveMode,
     updateOffenseWeight,
+    updateSavedLineupCount,
   }
 }

@@ -21,8 +21,10 @@ export function LineupBuilderPage() {
     updateObjectiveMode,
     offenseWeight,
     updateOffenseWeight,
+    savedLineupCount,
+    updateSavedLineupCount,
   } = useSettings()
-  const { lineups, error: lineupsError, saveLineup, removeLineup } = useLineups()
+  const { lineups, error: lineupsError, saveLineup, renameLineup, removeLineup } = useLineups()
   const [capInput, setCapInput] = useState(salaryCap)
   const [result, setResult] = useState<LineupResult | null>(null)
   const [preferredSearch, setPreferredSearch] = useState('')
@@ -45,6 +47,7 @@ export function LineupBuilderPage() {
 
   async function handleSaveLineup() {
     if (!result || !result.success) return
+    const nextCount = savedLineupCount + 1
     await saveLineup(
       result.slots.map((slot) => ({
         position: slot.position,
@@ -55,7 +58,9 @@ export function LineupBuilderPage() {
         offense: slot.player.offense,
         defense: slot.player.defense,
       })),
+      `Lineup ${nextCount}`,
     )
+    await updateSavedLineupCount(nextCount)
   }
 
   async function handleCapChange(value: number) {
@@ -105,6 +110,7 @@ export function LineupBuilderPage() {
           search={preferredSearch}
           onSearchChange={setPreferredSearch}
           onToggle={toggleRequired}
+          onClearAll={() => updateRequiredPlayerIds([])}
         />
 
         <PlayerChecklist
@@ -114,6 +120,7 @@ export function LineupBuilderPage() {
           search={unavailableSearch}
           onSearchChange={setUnavailableSearch}
           onToggle={toggleUnavailable}
+          onClearAll={() => updateUnavailablePlayerIds([])}
         />
 
         <div className="flex flex-col gap-2 text-xs uppercase tracking-widest text-muted">
@@ -173,7 +180,12 @@ export function LineupBuilderPage() {
         />
       </div>
 
-      <SavedLineupsPanel lineups={lineups} error={lineupsError} onDelete={removeLineup} />
+      <SavedLineupsPanel
+        lineups={lineups}
+        error={lineupsError}
+        onRename={renameLineup}
+        onDelete={removeLineup}
+      />
     </div>
   )
 }

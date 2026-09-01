@@ -185,3 +185,9 @@ alter table lineups enable row level security;
 
 create policy "lineups_owner" on lineups
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Saved lineups get an editable title. New saves are auto-titled
+-- "Lineup N" where N comes from a per-user monotonic counter, so deleting
+-- a lineup never reuses its number.
+alter table lineups add column title text not null default '';
+alter table settings add column saved_lineup_count integer not null default 0;
