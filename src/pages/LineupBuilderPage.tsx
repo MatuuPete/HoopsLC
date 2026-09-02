@@ -29,20 +29,19 @@ export function LineupBuilderPage() {
   const [preferredSearch, setPreferredSearch] = useState('')
 
   // Players already committed to a saved lineup are locked out of new ones.
-  const lockedIds = useMemo(() => lockedPlayerIds(lineups), [lineups])
+  const lockedIds = useMemo(() => lockedPlayerIds(lineups, players), [lineups, players])
   const availablePlayers = useMemo(
     () => players.filter((p) => !lockedIds.has(p.id)),
     [players, lockedIds],
   )
-  const committedNames = useMemo(() => {
-    const byId = new Map<string, string>()
-    for (const lineup of lineups) {
-      for (const slot of lineup.slots) {
-        if (slot.playerId) byId.set(slot.playerId, slot.name)
-      }
-    }
-    return [...byId.values()].sort()
-  }, [lineups])
+  const committedNames = useMemo(
+    () =>
+      players
+        .filter((p) => lockedIds.has(p.id))
+        .map((p) => p.name)
+        .sort(),
+    [players, lockedIds],
+  )
 
   useEffect(() => {
     setCapInput(salaryCap)
