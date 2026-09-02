@@ -93,20 +93,18 @@ function PlayerInspector({ player, players, onEdit, onDelete, onBack }: PlayerIn
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex justify-between items-start gap-2">
-        <div className="flex flex-col gap-0.5 min-w-0">
-          <span className="text-sm uppercase tracking-widest text-text truncate">{player.name}</span>
-          <span className="text-xs uppercase tracking-widest text-muted">
-            {player.positions.join('/')}
-            {player.isXPlayer ? ' · X Player' : ''}
-          </span>
-        </div>
-        <button
-          onClick={onBack}
-          className="text-xs uppercase tracking-widest text-muted shrink-0 hover:text-text"
-        >
-          &larr; Back
-        </button>
+      <button
+        onClick={onBack}
+        className="border border-border px-4 py-2 uppercase tracking-widest text-xs w-full text-left hover:bg-border"
+      >
+        &larr; Back to Roster Insights
+      </button>
+      <div className="flex flex-col gap-0.5 min-w-0">
+        <span className="text-sm uppercase tracking-widest text-text truncate">{player.name}</span>
+        <span className="text-xs uppercase tracking-widest text-muted">
+          {player.positions.join('/')}
+          {player.isXPlayer ? ' · X Player' : ''}
+        </span>
       </div>
 
       <div className="border-t border-border pt-3 flex flex-col gap-1">

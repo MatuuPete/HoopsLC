@@ -146,7 +146,9 @@ export function PlayersPage() {
           players={players}
           onEdit={openEditor}
           onDelete={handleDelete}
-          onSelect={(player) => setSelectedPlayerId(player.id)}
+          onSelect={(player) =>
+            setSelectedPlayerId((current) => (current === player.id ? null : player.id))
+          }
           selectedId={selectedPlayerId ?? undefined}
         />
       </div>
