@@ -5,6 +5,7 @@ import { PlayerForm } from '../components/PlayerForm'
 import { CatalogPlayerPicker } from '../components/CatalogPlayerPicker'
 import { CatalogPlayerSalaryForm } from '../components/CatalogPlayerSalaryForm'
 import { PlayerTable } from '../components/PlayerTable'
+import { RosterPanel } from '../components/RosterPanel'
 import type { Player } from '../optimizer/types'
 import type { CatalogPlayer } from '../catalog/types'
 import type { NewPlayer } from '../data/playersApi'
@@ -20,6 +21,16 @@ export function PlayersPage() {
   const { players, loading, error, addPlayer, editPlayer, removePlayer } = usePlayers()
   const { catalog } = useCatalog()
   const [mode, setMode] = useState<Mode>({ kind: 'closed' })
+  const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null)
+
+  function openEditor(player: Player) {
+    setMode(player.isXPlayer ? { kind: 'x-form', editing: player } : { kind: 'edit-catalog', player })
+  }
+
+  async function handleDelete(id: string) {
+    if (id === selectedPlayerId) setSelectedPlayerId(null)
+    await removePlayer(id)
+  }
 
   async function handleXSubmit(player: NewPlayer) {
     if (mode.kind === 'x-form' && mode.editing) {
@@ -133,14 +144,22 @@ export function PlayersPage() {
 
         <PlayerTable
           players={players}
-          onEdit={(player) =>
-            setMode(player.isXPlayer ? { kind: 'x-form', editing: player } : { kind: 'edit-catalog', player })
-          }
-          onDelete={removePlayer}
+          onEdit={openEditor}
+          onDelete={handleDelete}
+          onSelect={(player) => setSelectedPlayerId(player.id)}
+          selectedId={selectedPlayerId ?? undefined}
         />
       </div>
 
-      <div className="flex-1 border border-border" />
+      <div className="flex-1">
+        <RosterPanel
+          players={players}
+          selectedPlayerId={selectedPlayerId}
+          onEdit={openEditor}
+          onDelete={handleDelete}
+          onClearSelection={() => setSelectedPlayerId(null)}
+        />
+      </div>
     </div>
   )
 }

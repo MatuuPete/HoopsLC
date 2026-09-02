@@ -4,9 +4,11 @@ interface PlayerTableProps {
   players: Player[]
   onEdit: (player: Player) => void
   onDelete: (id: string) => void
+  onSelect?: (player: Player) => void
+  selectedId?: string
 }
 
-export function PlayerTable({ players, onEdit, onDelete }: PlayerTableProps) {
+export function PlayerTable({ players, onEdit, onDelete, onSelect, selectedId }: PlayerTableProps) {
   return (
     <table className="w-full text-sm border-collapse">
       <thead>
@@ -23,8 +25,19 @@ export function PlayerTable({ players, onEdit, onDelete }: PlayerTableProps) {
       </thead>
       <tbody>
         {players.map((p) => (
-          <tr key={p.id} className="border-b border-border">
-            <td className="py-2">{p.name}</td>
+          <tr key={p.id} className={`border-b border-border ${p.id === selectedId ? 'bg-panel' : ''}`}>
+            <td className="py-2">
+              {onSelect ? (
+                <button
+                  onClick={() => onSelect(p)}
+                  className="text-left hover:text-accent"
+                >
+                  {p.name}
+                </button>
+              ) : (
+                p.name
+              )}
+            </td>
             <td>{p.positions.join('/')}</td>
             <td>{p.isXPlayer ? 'X' : ''}</td>
             <td>{p.baseSalary}</td>
