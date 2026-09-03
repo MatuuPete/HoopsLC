@@ -16,6 +16,8 @@ export function LineupBuilderPage() {
     updateSalaryCap,
     requiredPlayerIds,
     updateRequiredPlayerIds,
+    unavailablePlayerIds,
+    updateUnavailablePlayerIds,
     objectiveMode,
     updateObjectiveMode,
     offenseWeight,
@@ -27,12 +29,20 @@ export function LineupBuilderPage() {
   const [capInput, setCapInput] = useState(salaryCap)
   const [result, setResult] = useState<LineupResult | null>(null)
   const [preferredSearch, setPreferredSearch] = useState('')
+  const [unavailableSearch, setUnavailableSearch] = useState('')
+  const [showUnavailable, setShowUnavailable] = useState(false)
 
   // Players already committed to a saved lineup are locked out of new ones.
   const lockedIds = useMemo(() => lockedPlayerIds(lineups, players), [lineups, players])
   const availablePlayers = useMemo(
     () => players.filter((p) => !lockedIds.has(p.id)),
     [players, lockedIds],
+  )
+  // Only count ids that still map to an owned player not already locked, so
+  // stale ids left in settings don't inflate the badge.
+  const unavailableCount = useMemo(
+    () => availablePlayers.filter((p) => unavailablePlayerIds.includes(p.id)).length,
+    [availablePlayers, unavailablePlayerIds],
   )
   const committedNames = useMemo(
     () =>
@@ -51,7 +61,7 @@ export function LineupBuilderPage() {
     setResult(
       findBestLineup(players, capInput, {
         requiredPlayerIds,
-        unavailablePlayerIds: [...lockedIds],
+        unavailablePlayerIds: [...new Set([...lockedIds, ...unavailablePlayerIds])],
         objectiveMode,
         offenseWeight,
       }),
@@ -89,6 +99,13 @@ export function LineupBuilderPage() {
     updateRequiredPlayerIds(next)
   }
 
+  function toggleUnavailable(playerId: string) {
+    const next = unavailablePlayerIds.includes(playerId)
+      ? unavailablePlayerIds.filter((id) => id !== playerId)
+      : [...unavailablePlayerIds, playerId]
+    updateUnavailablePlayerIds(next)
+  }
+
   return (
     <div className="flex gap-6 p-6">
       <div className="flex flex-col gap-4 w-full max-w-md">
@@ -118,6 +135,34 @@ export function LineupBuilderPage() {
             <p className="text-xs text-muted normal-case tracking-normal">
               Committed to saved lineups: {committedNames.join(', ')}
             </p>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <button
+            onClick={() => setShowUnavailable((v) => !v)}
+            className="flex items-center justify-between text-xs uppercase tracking-widest text-muted border border-border px-3 py-2"
+          >
+            <span>
+              Unavailable Players{unavailableCount > 0 ? ` (${unavailableCount})` : ''}
+            </span>
+            <span aria-hidden>{showUnavailable ? '−' : '+'}</span>
+          </button>
+          {showUnavailable && (
+            <>
+              <PlayerChecklist
+                label="Borrowed / Unavailable"
+                players={availablePlayers}
+                selectedIds={unavailablePlayerIds}
+                search={unavailableSearch}
+                onSearchChange={setUnavailableSearch}
+                onToggle={toggleUnavailable}
+                onClearAll={() => updateUnavailablePlayerIds([])}
+              />
+              <p className="text-xs text-muted normal-case tracking-normal">
+                Excluded from the calculated lineup — for players a friend has borrowed.
+              </p>
+            </>
           )}
         </div>
 

@@ -194,7 +194,10 @@ alter table settings add column saved_lineup_count integer not null default 0;
 
 -- Each saved-lineup slot object now also carries `playerId` (the owned
 -- player it was filled with). A player in any saved lineup is locked out
--- of future lineup calculations, which replaced the manual "unavailable
--- players" list -- settings.unavailable_player_ids is now vestigial and no
--- longer read or written by the app. Slots saved before `playerId` existed
+-- of future lineup calculations. Slots saved before `playerId` existed
 -- lock nothing. No DDL: `slots` is jsonb.
+
+-- settings.unavailable_player_ids (added above) is read/written again: it
+-- backs the lineup builder's optional "Unavailable Players" list, for
+-- players a friend has borrowed that aren't in any saved lineup. The
+-- optimizer excludes the union of this list and the saved-lineup locks.
