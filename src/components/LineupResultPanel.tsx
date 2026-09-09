@@ -95,7 +95,7 @@ export function LineupResultPanel({ result, players, onSave }: LineupResultPanel
               {slot.player.isXPlayer ? ' (X)' : ''}
             </span>
             <span>{slot.player.name}</span>
-            <span>{slot.player.currentSalary}</span>
+            <span>{slot.player.baseSalary}</span>
           </div>
         ))}
         <div className="border-t border-border pt-3 flex justify-between text-xs uppercase tracking-widest text-muted">
@@ -103,11 +103,11 @@ export function LineupResultPanel({ result, players, onSave }: LineupResultPanel
           <span>{result.cheapestPossibleBaseSalary}</span>
         </div>
         <div className="flex justify-between text-xs uppercase tracking-widest text-muted">
-          <span>Closest Total Power by Sal</span>
+          <span>Closest TPower by Salary w/o kits</span>
           <span>{result.closestTotalCurrentSalary}</span>
         </div>
         <div className="flex justify-between text-xs uppercase tracking-widest text-muted">
-          <span>Closest Total Power by Stats</span>
+          <span>Closest TPower by Stats w/o kits</span>
           <span>{sumStatPower(result.closestLineup)}</span>
         </div>
         <div className="flex justify-between text-xs uppercase tracking-widest text-muted">
@@ -133,7 +133,7 @@ export function LineupResultPanel({ result, players, onSave }: LineupResultPanel
             {slot.player.isXPlayer ? ' (X)' : ''}
           </span>
           <span>{slot.player.name}</span>
-          <span>{slot.player.currentSalary}</span>
+          <span>{slot.player.baseSalary}</span>
         </div>
       ))}
       <div className="border-t border-border pt-3 flex justify-between text-xs uppercase tracking-widest text-muted">
@@ -141,11 +141,11 @@ export function LineupResultPanel({ result, players, onSave }: LineupResultPanel
         <span>{result.totalBaseSalary}</span>
       </div>
       <div className="flex justify-between text-xs uppercase tracking-widest text-muted">
-        <span>Total Power by Sal</span>
+        <span>TPower by Salary w/o kits</span>
         <span>{result.totalCurrentSalary}</span>
       </div>
       <div className="flex justify-between text-xs uppercase tracking-widest text-muted">
-        <span>Total Power by Stats</span>
+        <span>TPower by Stats w/o kits</span>
         <span>{sumStatPower(result.slots)}</span>
       </div>
       <div className="flex justify-between text-xs uppercase tracking-widest text-muted">

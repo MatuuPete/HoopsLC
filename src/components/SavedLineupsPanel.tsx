@@ -93,12 +93,12 @@ function SavedLineupCard({
             {slot.isXPlayer ? ' (X)' : ''}
           </span>
           <span>{slot.name}</span>
-          <span>{slot.currentSalary}</span>
+          <span>{slot.baseSalary}</span>
         </div>
       ))}
 
       <div className="border-t border-border pt-3 flex justify-between text-xs uppercase tracking-widest text-muted">
-        <span>Total Power by Sal</span>
+        <span>TPower by Salary w/o kits</span>
         <span>{totals.totalPowerBySal}</span>
       </div>
       <div className="flex justify-between text-xs uppercase tracking-widest text-muted">
