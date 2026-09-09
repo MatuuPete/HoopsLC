@@ -215,19 +215,6 @@ export function LineupBuilderPage() {
         >
           Calculate Best Lineup
         </button>
-      </div>
-
-      <div className="flex flex-col gap-6 flex-1 min-w-0">
-        {result && (
-          <div className="flex flex-col gap-4 w-full max-w-md">
-            <h2 className="text-sm uppercase tracking-widest text-muted">Best Lineup</h2>
-            <LineupResultPanel
-              result={result}
-              players={players}
-              onSave={result.success ? handleSaveLineup : undefined}
-            />
-          </div>
-        )}
 
         <SavedLineupsPanel
           lineups={lineups}
@@ -236,6 +223,17 @@ export function LineupBuilderPage() {
           onDelete={removeLineup}
         />
       </div>
+
+      {result && (
+        <div className="flex flex-col gap-4 w-full max-w-md">
+          <h2 className="text-sm uppercase tracking-widest text-muted">Best Lineup</h2>
+          <LineupResultPanel
+            result={result}
+            players={players}
+            onSave={result.success ? handleSaveLineup : undefined}
+          />
+        </div>
+      )}
     </div>
   )
 }
