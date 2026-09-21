@@ -4,6 +4,7 @@ import { ProtectedRoute } from './auth/ProtectedRoute'
 import { AdminRoute } from './auth/AdminRoute'
 import { HomeRoute } from './auth/HomeRoute'
 import { LoginPage } from './auth/LoginPage'
+import { SignUpPage } from './auth/SignUpPage'
 import { AppLayout } from './components/AppLayout'
 import { PlayersPage } from './pages/PlayersPage'
 import { LineupBuilderPage } from './pages/LineupBuilderPage'
@@ -16,6 +17,7 @@ function App() {
         <Routes>
           <Route path="/" element={<HomeRoute />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignUpPage />} />
           <Route
             element={
               <ProtectedRoute>

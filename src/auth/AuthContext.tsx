@@ -9,6 +9,7 @@ interface AuthContextValue {
   isAdmin: boolean
   adminLoading: boolean
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
+  signUp: (email: string, password: string) => Promise<{ error: string | null; needsConfirmation: boolean }>
   signOut: () => Promise<void>
 }
 
@@ -70,12 +71,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error?.message ?? null }
   }
 
+  async function signUp(email: string, password: string) {
+    const { data, error } = await supabase.auth.signUp({ email, password })
+    // With email confirmation enabled, Supabase creates the user but returns no session.
+    return { error: error?.message ?? null, needsConfirmation: !error && !data.session }
+  }
+
   async function signOut() {
     await supabase.auth.signOut()
   }
 
   return (
-    <AuthContext.Provider value={{ session, loading, isAdmin, adminLoading, signIn, signOut }}>
+    <AuthContext.Provider value={{ session, loading, isAdmin, adminLoading, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   )

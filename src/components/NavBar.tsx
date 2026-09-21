@@ -1,4 +1,4 @@
-import { Link, NavLink } from 'react-router-dom'
+import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { Logo } from './Logo'
 
@@ -9,6 +9,7 @@ const baseLinks = [
 
 export function NavBar() {
   const { signOut, isAdmin } = useAuth()
+  const navigate = useNavigate()
   const links = isAdmin ? [...baseLinks, { to: '/admin/catalog', label: 'Catalog Admin' }] : baseLinks
 
   return (
@@ -32,7 +33,12 @@ export function NavBar() {
             {link.label}
           </NavLink>
         ))}
-        <button onClick={() => signOut()} className="text-xs uppercase tracking-widest text-muted">
+        <button
+          onClick={async () => {
+            await signOut()
+            navigate('/', { replace: true })
+          }}
+          className="text-xs uppercase tracking-widest text-muted">
           Sign Out
         </button>
       </div>
