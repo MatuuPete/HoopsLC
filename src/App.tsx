@@ -5,6 +5,7 @@ import { AdminRoute } from './auth/AdminRoute'
 import { HomeRoute } from './auth/HomeRoute'
 import { LoginPage } from './auth/LoginPage'
 import { SignUpPage } from './auth/SignUpPage'
+import { WelcomePage } from './auth/WelcomePage'
 import { AppLayout } from './components/AppLayout'
 import { PlayersPage } from './pages/PlayersPage'
 import { LineupBuilderPage } from './pages/LineupBuilderPage'
@@ -18,6 +19,7 @@ function App() {
           <Route path="/" element={<HomeRoute />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignUpPage />} />
+          <Route path="/welcome" element={<WelcomePage />} />
           <Route
             element={
               <ProtectedRoute>

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from './AuthContext'
+import { GoogleSignInButton } from './GoogleSignInButton'
 
 export function LoginPage() {
   const { signIn, session } = useAuth()
@@ -30,6 +31,10 @@ export function LoginPage() {
       <form onSubmit={handleSubmit} className="border border-border bg-panel p-6 flex flex-col gap-3 w-80">
         <h1 className="text-sm uppercase tracking-widest text-muted">Sign In</h1>
 
+        <GoogleSignInButton />
+
+        <p className="text-xs text-muted text-center uppercase tracking-widest">or with email</p>
+
         <label className="flex flex-col gap-1 text-xs uppercase tracking-widest text-muted">
           Email
           <input
@@ -58,7 +63,7 @@ export function LoginPage() {
         <button
           type="submit"
           disabled={submitting}
-          className="bg-text text-bg px-4 py-2 uppercase tracking-widest text-xs font-bold disabled:opacity-50"
+          className="border border-border px-4 py-2 uppercase tracking-widest text-xs font-bold disabled:opacity-50"
         >
           Sign In
         </button>

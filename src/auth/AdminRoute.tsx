@@ -3,8 +3,8 @@ import { Navigate } from 'react-router-dom'
 import { useAuth } from './AuthContext'
 
 export function AdminRoute({ children }: { children: ReactNode }) {
-  const { loading, isAdmin, adminLoading } = useAuth()
-  if (loading || adminLoading) return null
+  const { loading, isAdmin, profileLoading } = useAuth()
+  if (loading || profileLoading) return null
   if (!isAdmin) return <Navigate to="/players" replace />
   return <>{children}</>
 }

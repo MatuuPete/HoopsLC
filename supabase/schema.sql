@@ -202,6 +202,38 @@ alter table settings add column saved_lineup_count integer not null default 0;
 -- players a friend has borrowed that aren't in any saved lineup. The
 -- optimizer excludes the union of this list and the saved-lineup locks.
 
+-- Usernames: picked once after first sign-in (Google OAuth).
+-- Most users have no profiles row until they pick one, so set_username
+-- upserts it. It's SECURITY DEFINER so there is no client insert/update
+-- policy on profiles at all -- a client-writable profiles row would let a
+-- user set their own is_admin.
+alter table profiles add column username text;
+
+alter table profiles add constraint profiles_username_format
+  check (username ~ '^[A-Za-z0-9_]{3,20}$');
+
+create unique index profiles_username_key on profiles (lower(username));
+
+create or replace function set_username(new_username text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'not authenticated';
+  end if;
+
+  insert into profiles (user_id, username)
+  values (auth.uid(), new_username)
+  on conflict (user_id) do update set username = excluded.username;
+end;
+$$;
+
+revoke all on function set_username(text) from public;
+grant execute on function set_username(text) to authenticated;
+
 -- Legend X: a second X Player tier whose Offense + Defense total is 500
 -- instead of 450. Salary stays fixed at 999 and a lineup still has
 -- exactly one X Player of either tier. x_tier is null for regular players.
