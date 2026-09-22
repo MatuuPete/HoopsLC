@@ -1,4 +1,4 @@
-import type { Player } from '../optimizer/types'
+import { X_TIERS, type Player } from '../optimizer/types'
 
 interface PlayerTableProps {
   players: Player[]
@@ -39,7 +39,7 @@ export function PlayerTable({ players, onEdit, onDelete, onSelect, selectedId }:
               )}
             </td>
             <td>{p.positions.join('/')}</td>
-            <td>{p.isXPlayer ? 'X' : ''}</td>
+            <td>{p.xTier ? X_TIERS[p.xTier].shortLabel : ''}</td>
             <td>{p.baseSalary}</td>
             <td>{p.currentSalary}</td>
             <td>{p.offense}</td>

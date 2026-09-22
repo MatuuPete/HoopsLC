@@ -21,6 +21,7 @@ function player(overrides: Partial<Player>): Player {
     name: 'Player',
     positions: ['PG'],
     isXPlayer: false,
+    xTier: null,
     baseSalary: 0,
     currentSalary: 0,
     offense: 0,

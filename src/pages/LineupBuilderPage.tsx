@@ -77,6 +77,7 @@ export function LineupBuilderPage() {
         playerId: slot.player.id,
         name: slot.player.name,
         isXPlayer: slot.player.isXPlayer,
+        ...(slot.player.xTier ? { xTier: slot.player.xTier } : {}),
         currentSalary: slot.player.currentSalary,
         baseSalary: slot.player.baseSalary,
         offense: slot.player.offense,

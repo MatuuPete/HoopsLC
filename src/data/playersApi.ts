@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabaseClient'
-import type { Player } from '../optimizer/types'
+import type { Player, XTier } from '../optimizer/types'
 
 interface PlayerRow {
   id: string
@@ -7,6 +7,7 @@ interface PlayerRow {
   name: string
   positions: Player['positions']
   is_x_player: boolean
+  x_tier: XTier | null
   base_salary: number
   current_salary: number
   offense: number
@@ -20,6 +21,7 @@ function fromRow(row: PlayerRow): Player {
     name: row.name,
     positions: row.positions,
     isXPlayer: row.is_x_player,
+    xTier: row.is_x_player ? (row.x_tier ?? 'standard') : null,
     baseSalary: row.base_salary,
     currentSalary: row.current_salary,
     offense: row.offense,
@@ -29,6 +31,11 @@ function fromRow(row: PlayerRow): Player {
 }
 
 export type NewPlayer = Omit<Player, 'id'>
+
+/** x_tier is only sent for X Players, so regular-player saves never depend on that column. */
+function xTierColumn(player: NewPlayer) {
+  return player.isXPlayer ? { x_tier: player.xTier ?? 'standard' } : {}
+}
 
 export async function listPlayers(): Promise<Player[]> {
   const { data, error } = await supabase.from('players').select('*').order('name')
@@ -44,6 +51,7 @@ export async function createPlayer(player: NewPlayer, userId: string): Promise<P
       name: player.name,
       positions: player.positions,
       is_x_player: player.isXPlayer,
+      ...xTierColumn(player),
       base_salary: player.baseSalary,
       current_salary: player.currentSalary,
       offense: player.offense,
@@ -63,6 +71,7 @@ export async function updatePlayer(id: string, player: NewPlayer): Promise<Playe
       name: player.name,
       positions: player.positions,
       is_x_player: player.isXPlayer,
+      ...xTierColumn(player),
       base_salary: player.baseSalary,
       current_salary: player.currentSalary,
       offense: player.offense,

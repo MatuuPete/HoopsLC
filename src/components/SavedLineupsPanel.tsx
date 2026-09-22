@@ -1,6 +1,7 @@
 import { useState, type KeyboardEvent } from 'react'
 import type { SavedLineup } from '../data/lineupsApi'
 import { summarizeSavedLineup } from '../optimizer/summarizeSavedLineup'
+import { X_TIERS } from '../optimizer/types'
 
 interface SavedLineupsPanelProps {
   lineups: SavedLineup[]
@@ -90,7 +91,7 @@ function SavedLineupCard({
         <div key={slot.position} className="flex justify-between text-sm">
           <span className="text-muted uppercase tracking-widest">
             {slot.position}
-            {slot.isXPlayer ? ' (X)' : ''}
+            {slot.isXPlayer ? ` (${X_TIERS[slot.xTier ?? 'standard'].shortLabel})` : ''}
           </span>
           <span>{slot.name}</span>
           <span>{slot.baseSalary}</span>

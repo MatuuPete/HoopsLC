@@ -2,11 +2,21 @@ export type Position = 'PG' | 'SG' | 'SF' | 'PF' | 'C'
 
 export const POSITIONS: Position[] = ['PG', 'SG', 'SF', 'PF', 'C']
 
+export type XTier = 'standard' | 'legend'
+
+/** Offense + Defense must equal exactly `statTotal` for an X Player of that tier. */
+export const X_TIERS: Record<XTier, { label: string; shortLabel: string; statTotal: number }> = {
+  standard: { label: 'X Player', shortLabel: 'X', statTotal: 450 },
+  legend: { label: 'Legend X', shortLabel: 'LX', statTotal: 500 },
+}
+
 export interface Player {
   id: string
   name: string
   positions: Position[]
   isXPlayer: boolean
+  /** Set only for X Players; null for regular players. */
+  xTier: XTier | null
   baseSalary: number
   currentSalary: number
   offense: number
@@ -34,6 +44,8 @@ export interface SavedLineupSlot {
   playerId?: string
   name: string
   isXPlayer: boolean
+  /** Absent on lineups saved before Legend X existed — those are standard. */
+  xTier?: XTier
   currentSalary: number
   baseSalary: number
   offense: number

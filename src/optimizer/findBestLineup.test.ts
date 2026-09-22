@@ -13,6 +13,7 @@ function makePlayer(overrides: Partial<Player> & Pick<Player, 'id' | 'positions'
   return {
     name: overrides.id,
     isXPlayer: false,
+    xTier: null,
     baseSalary: 100,
     currentSalary: 100,
     offense: 50,

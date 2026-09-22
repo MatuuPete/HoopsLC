@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { LineupResult, LineupSlot, Player } from '../optimizer/types'
+import { X_TIERS, type LineupResult, type LineupSlot, type Player } from '../optimizer/types'
 
 function sumOffense(slots: LineupSlot[]): number {
   return slots.reduce((sum, slot) => sum + slot.player.offense, 0)
@@ -92,7 +92,7 @@ export function LineupResultPanel({ result, players, onSave }: LineupResultPanel
           <div key={slot.position} className="flex justify-between text-sm">
             <span className="text-muted uppercase tracking-widest">
               {slot.position}
-              {slot.player.isXPlayer ? ' (X)' : ''}
+              {slot.player.xTier ? ` (${X_TIERS[slot.player.xTier].shortLabel})` : ''}
             </span>
             <span>{slot.player.name}</span>
             <span>{slot.player.baseSalary}</span>
@@ -130,7 +130,7 @@ export function LineupResultPanel({ result, players, onSave }: LineupResultPanel
         <div key={slot.position} className="flex justify-between text-sm">
           <span className="text-muted uppercase tracking-widest">
             {slot.position}
-            {slot.player.isXPlayer ? ' (X)' : ''}
+            {slot.player.xTier ? ` (${X_TIERS[slot.player.xTier].shortLabel})` : ''}
           </span>
           <span>{slot.player.name}</span>
           <span>{slot.player.baseSalary}</span>

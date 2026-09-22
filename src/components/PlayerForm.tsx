@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from 'react'
 import type { NewPlayer } from '../data/playersApi'
-import type { Position } from '../optimizer/types'
+import { X_TIERS, type Position, type XTier } from '../optimizer/types'
 
 const POSITIONS: Position[] = ['PG', 'SG', 'SF', 'PF', 'C']
-const X_PLAYER_STAT_TOTAL = 450
+const TIERS = Object.keys(X_TIERS) as XTier[]
 const X_PLAYER_SALARY = 999
 
 interface PlayerFormProps {
@@ -14,13 +14,15 @@ interface PlayerFormProps {
 
 export function PlayerForm({ initial, onSubmit, onCancel }: PlayerFormProps) {
   const [name, setName] = useState(initial?.name ?? '')
+  const [tier, setTier] = useState<XTier>(initial?.xTier ?? 'standard')
   const [positions, setPositions] = useState<Position[]>(initial?.positions ?? ['PG'])
   const [offense, setOffense] = useState(initial?.offense ?? 0)
   const [defense, setDefense] = useState(initial?.defense ?? 0)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
-  const statsValid = offense + defense === X_PLAYER_STAT_TOTAL
+  const statTotal = X_TIERS[tier].statTotal
+  const statsValid = offense + defense === statTotal
   const positionsValid = positions.length > 0
 
   function togglePosition(position: Position) {
@@ -39,6 +41,7 @@ export function PlayerForm({ initial, onSubmit, onCancel }: PlayerFormProps) {
         name,
         positions,
         isXPlayer: true,
+        xTier: tier,
         baseSalary: X_PLAYER_SALARY,
         currentSalary: X_PLAYER_SALARY,
         offense,
@@ -54,6 +57,26 @@ export function PlayerForm({ initial, onSubmit, onCancel }: PlayerFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="border border-border bg-panel p-4 flex flex-col gap-3">
+      <div className="flex flex-col gap-1 text-xs uppercase tracking-widest text-muted">
+        Type
+        <div className="flex gap-2">
+          {TIERS.map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setTier(t)}
+              className={
+                tier === t
+                  ? `border px-3 py-1 ${t === 'legend' ? 'border-amber-400 text-amber-400' : 'border-accent text-accent'}`
+                  : 'border border-border text-muted px-3 py-1'
+              }
+            >
+              {X_TIERS[t].label} · {X_TIERS[t].statTotal}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <label className="flex flex-col gap-1 text-xs uppercase tracking-widest text-muted">
         Name
         <input
@@ -109,11 +132,10 @@ export function PlayerForm({ initial, onSubmit, onCancel }: PlayerFormProps) {
         />
       </label>
 
-      {!statsValid && (
-        <p className="text-xs text-red-400">
-          Offense + Defense must equal exactly {X_PLAYER_STAT_TOTAL} for an X Player.
-        </p>
-      )}
+      <p className={`text-xs ${statsValid ? 'text-accent' : 'text-red-400'}`}>
+        Offense + Defense: {offense + defense} / {statTotal}
+        {!statsValid && ` — must equal exactly ${statTotal} for a ${X_TIERS[tier].label}.`}
+      </p>
 
       {submitError && <p className="text-xs text-red-400">{submitError}</p>}
 

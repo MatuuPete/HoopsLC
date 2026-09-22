@@ -201,3 +201,21 @@ alter table settings add column saved_lineup_count integer not null default 0;
 -- backs the lineup builder's optional "Unavailable Players" list, for
 -- players a friend has borrowed that aren't in any saved lineup. The
 -- optimizer excludes the union of this list and the saved-lineup locks.
+
+-- Legend X: a second X Player tier whose Offense + Defense total is 500
+-- instead of 450. Salary stays fixed at 999 and a lineup still has
+-- exactly one X Player of either tier. x_tier is null for regular players.
+alter table players add column x_tier text;
+update players set x_tier = 'standard' where is_x_player;
+
+alter table players add constraint players_x_tier_valid check (
+  (is_x_player and x_tier in ('standard', 'legend'))
+  or (not is_x_player and x_tier is null)
+);
+
+alter table players drop constraint x_player_stats;
+alter table players add constraint x_player_stats check (
+  not is_x_player
+  or (x_tier = 'standard' and offense + defense = 450)
+  or (x_tier = 'legend' and offense + defense = 500)
+);

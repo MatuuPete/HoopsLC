@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { Player } from '../optimizer/types'
+import { X_TIERS, type Player } from '../optimizer/types'
 import {
   positionalCoverage,
   valueRanking,
@@ -103,7 +103,7 @@ function PlayerInspector({ player, players, onEdit, onDelete, onBack }: PlayerIn
         <span className="text-sm uppercase tracking-widest text-text truncate">{player.name}</span>
         <span className="text-xs uppercase tracking-widest text-muted">
           {player.positions.join('/')}
-          {player.isXPlayer ? ' · X Player' : ''}
+          {player.xTier ? ` · ${X_TIERS[player.xTier].label}` : ''}
         </span>
       </div>
 
