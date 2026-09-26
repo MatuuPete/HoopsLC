@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { POSITIONS, type Position } from '../optimizer/types'
+import type { Position } from '../optimizer/types'
 import type { CatalogPlayer } from '../catalog/types'
+import { FormCard, PositionFilter, SearchInput } from './ui'
 
 interface CatalogPlayerPickerProps {
   catalog: CatalogPlayer[]
@@ -19,46 +20,41 @@ export function CatalogPlayerPicker({ catalog, onSelect, onCancel }: CatalogPlay
   })
 
   return (
-    <div className="border border-border bg-panel p-4 flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm uppercase tracking-widest text-muted">Choose a Player</h2>
-        <button onClick={onCancel} className="text-xs uppercase tracking-widest text-muted underline">
-          Cancel
-        </button>
-      </div>
+    <FormCard eyebrow="Add from catalog" title="Choose a player" onClose={onCancel}>
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="sm:w-64">
+            <SearchInput value={search} onChange={setSearch} placeholder="Search catalog" label="Search catalog" />
+          </div>
+          <PositionFilter value={positionFilter} onChange={setPositionFilter} />
+        </div>
 
-      <input
-        className="bg-bg border border-border px-2 py-1 text-text text-sm"
-        placeholder="Search player..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-      />
-
-      <div className="flex gap-2 text-xs uppercase tracking-widest">
-        {(['ALL', ...POSITIONS] as const).map((option) => (
-          <button
-            key={option}
-            onClick={() => setPositionFilter(option)}
-            className={positionFilter === option ? 'text-accent' : 'text-muted'}
-          >
-            {option}
-          </button>
-        ))}
+        <div className="overflow-hidden rounded-lg border border-border bg-bg">
+          <div className="grid grid-cols-[minmax(0,1fr)_5rem_4rem] gap-3 border-b border-border px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
+            <span>Player</span>
+            <span>Pos</span>
+            <span className="text-right">Price</span>
+          </div>
+          <div className="scrollbar-slim max-h-80 overflow-y-auto p-1">
+            {filtered.map((player) => (
+              <button
+                key={player.id}
+                onClick={() => onSelect(player)}
+                className="grid w-full grid-cols-[minmax(0,1fr)_5rem_4rem] items-center gap-3 rounded-md px-2 py-2 text-left text-sm transition-colors hover:bg-white/[0.05] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+              >
+                <span className="truncate text-text">{player.name}</span>
+                <span className="font-mono text-xs text-muted">{player.positions.join('/')}</span>
+                <span className="text-right font-mono text-xs tabular-nums text-text">{player.price}</span>
+              </button>
+            ))}
+            {filtered.length === 0 && (
+              <p className="px-2 py-6 text-center text-sm text-muted">
+                {catalog.length === 0 ? 'The catalog is empty.' : 'No catalog players match these filters.'}
+              </p>
+            )}
+          </div>
+        </div>
       </div>
-
-      <div className="flex flex-col gap-1 max-h-80 overflow-y-auto">
-        {filtered.map((player) => (
-          <button
-            key={player.id}
-            onClick={() => onSelect(player)}
-            className="flex justify-between text-sm py-1 border-b border-border text-left"
-          >
-            <span>{player.name}</span>
-            <span className="text-muted">{player.positions.join('/')}</span>
-            <span>{player.price}</span>
-          </button>
-        ))}
-      </div>
-    </div>
+    </FormCard>
   )
 }

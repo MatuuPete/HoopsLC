@@ -1,15 +1,23 @@
 import { useState, type FormEvent } from 'react'
 import type { NewPlayer } from '../data/playersApi'
 import { X_TIERS, type Position, type XTier } from '../optimizer/types'
+import {
+  Field,
+  FormCard,
+  PositionPicker,
+  buttonPrimary,
+  buttonSecondary,
+  inputClass,
+  numberInputClass,
+} from './ui'
 
-const POSITIONS: Position[] = ['PG', 'SG', 'SF', 'PF', 'C']
 const TIERS = Object.keys(X_TIERS) as XTier[]
 const X_PLAYER_SALARY = 999
 
 interface PlayerFormProps {
   initial?: NewPlayer
   onSubmit: (player: NewPlayer) => Promise<void>
-  onCancel?: () => void
+  onCancel: () => void
 }
 
 export function PlayerForm({ initial, onSubmit, onCancel }: PlayerFormProps) {
@@ -22,7 +30,8 @@ export function PlayerForm({ initial, onSubmit, onCancel }: PlayerFormProps) {
   const [submitError, setSubmitError] = useState<string | null>(null)
 
   const statTotal = X_TIERS[tier].statTotal
-  const statsValid = offense + defense === statTotal
+  const sum = offense + defense
+  const statsValid = sum === statTotal
   const positionsValid = positions.length > 0
 
   function togglePosition(position: Position) {
@@ -56,107 +65,109 @@ export function PlayerForm({ initial, onSubmit, onCancel }: PlayerFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="border border-border bg-panel p-4 flex flex-col gap-3">
-      <div className="flex flex-col gap-1 text-xs uppercase tracking-widest text-muted">
-        Type
-        <div className="flex gap-2">
-          {TIERS.map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTier(t)}
-              className={
-                tier === t
-                  ? `border px-3 py-1 ${t === 'legend' ? 'border-amber-400 text-amber-400' : 'border-accent text-accent'}`
-                  : 'border border-border text-muted px-3 py-1'
-              }
-            >
-              {X_TIERS[t].label} · {X_TIERS[t].statTotal}
-            </button>
-          ))}
-        </div>
-      </div>
+    <FormCard eyebrow={initial ? 'Edit X Player' : 'Add X Player'} title={initial?.name ?? 'New X Player'} onClose={onCancel}>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+        <Field label="Type">
+          <div role="radiogroup" aria-label="X Player type" className="grid grid-cols-2 gap-1 rounded-lg border border-border bg-bg p-1">
+            {TIERS.map((t) => (
+              <button
+                key={t}
+                type="button"
+                role="radio"
+                aria-checked={tier === t}
+                onClick={() => setTier(t)}
+                className={`flex items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+                  tier === t
+                    ? 'bg-white/[0.09] text-text shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]'
+                    : 'text-muted hover:text-text'
+                }`}
+              >
+                {X_TIERS[t].label}
+                <span className="font-mono text-xs text-muted">{X_TIERS[t].statTotal}</span>
+              </button>
+            ))}
+          </div>
+        </Field>
 
-      <label className="flex flex-col gap-1 text-xs uppercase tracking-widest text-muted">
-        Name
-        <input
-          className="bg-bg border border-border px-2 py-1 text-text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-        />
-      </label>
+        <Field label="Name" htmlFor="x-name">
+          <input
+            id="x-name"
+            className={inputClass}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            autoFocus
+            required
+          />
+        </Field>
 
-      <div className="flex flex-col gap-1 text-xs uppercase tracking-widest text-muted">
-        Positions
-        <div className="flex gap-2">
-          {POSITIONS.map((p) => (
-            <button
-              key={p}
-              type="button"
-              onClick={() => togglePosition(p)}
-              className={
-                positions.includes(p)
-                  ? 'border border-accent text-accent px-3 py-1'
-                  : 'border border-border text-muted px-3 py-1'
-              }
-            >
-              {p}
-            </button>
-          ))}
-        </div>
-        {!positionsValid && (
-          <p className="text-xs text-red-400 normal-case tracking-normal">Select at least one position.</p>
-        )}
-      </div>
-
-      <label className="flex flex-col gap-1 text-xs uppercase tracking-widest text-muted">
-        Offense
-        <input
-          type="number"
-          className="bg-bg border border-border px-2 py-1 text-text"
-          value={offense || ''}
-          onChange={(e) => setOffense(e.target.value === '' ? 0 : Number(e.target.value))}
-          required
-        />
-      </label>
-
-      <label className="flex flex-col gap-1 text-xs uppercase tracking-widest text-muted">
-        Defense
-        <input
-          type="number"
-          className="bg-bg border border-border px-2 py-1 text-text"
-          value={defense || ''}
-          onChange={(e) => setDefense(e.target.value === '' ? 0 : Number(e.target.value))}
-          required
-        />
-      </label>
-
-      <p className={`text-xs ${statsValid ? 'text-accent' : 'text-red-400'}`}>
-        Offense + Defense: {offense + defense} / {statTotal}
-        {!statsValid && ` — must equal exactly ${statTotal} for a ${X_TIERS[tier].label}.`}
-      </p>
-
-      {submitError && <p className="text-xs text-red-400">{submitError}</p>}
-
-      <div className="flex gap-2">
-        <button
-          type="submit"
-          disabled={submitting || !statsValid || !positionsValid}
-          className="bg-text text-bg px-4 py-2 uppercase tracking-widest text-xs font-bold disabled:opacity-50"
+        <Field
+          label="Positions"
+          hint={!positionsValid ? <span className="text-red-400">Select at least one position.</span> : undefined}
         >
-          Save
-        </button>
-        {onCancel && (
-          <button
-            type="button"
-            onClick={onCancel}
-            className="border border-border px-4 py-2 uppercase tracking-widest text-xs"
-          >
+          <PositionPicker selected={positions} onToggle={togglePosition} />
+        </Field>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Offense" htmlFor="x-offense">
+            <input
+              id="x-offense"
+              type="number"
+              inputMode="numeric"
+              className={numberInputClass}
+              value={offense || ''}
+              onChange={(e) => setOffense(e.target.value === '' ? 0 : Number(e.target.value))}
+              required
+            />
+          </Field>
+          <Field label="Defense" htmlFor="x-defense">
+            <input
+              id="x-defense"
+              type="number"
+              inputMode="numeric"
+              className={numberInputClass}
+              value={defense || ''}
+              onChange={(e) => setDefense(e.target.value === '' ? 0 : Number(e.target.value))}
+              required
+            />
+          </Field>
+        </div>
+
+        <div className="flex flex-col gap-2 rounded-lg border border-border bg-bg px-4 py-3">
+          <div className="flex items-baseline justify-between text-xs">
+            <span className="text-muted">Offense + Defense</span>
+            <span className="font-mono tabular-nums">
+              <span className={statsValid ? 'text-accent' : sum > statTotal ? 'text-red-400' : 'text-text'}>{sum}</span>
+              <span className="text-muted"> / {statTotal}</span>
+            </span>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+            <div
+              className={`h-full rounded-full ${statsValid ? 'bg-accent' : sum > statTotal ? 'bg-red-400' : 'bg-muted/60'} motion-safe:transition-[width]`}
+              style={{ width: `${Math.min(1, sum / statTotal) * 100}%` }}
+            />
+          </div>
+          <p className={`text-xs ${statsValid ? 'text-accent' : 'text-muted'}`}>
+            {statsValid
+              ? 'Stats add up.'
+              : `Must total exactly ${statTotal} for this type. ${
+                  sum < statTotal ? `${statTotal - sum} to go.` : `${sum - statTotal} over.`
+                }`}
+          </p>
+        </div>
+
+        <p className="text-xs text-muted">X Players always cost {X_PLAYER_SALARY} salary.</p>
+
+        {submitError && <p className="text-sm text-red-400">{submitError}</p>}
+
+        <div className="flex gap-2 border-t border-border pt-5">
+          <button type="submit" disabled={submitting || !statsValid || !positionsValid} className={buttonPrimary}>
+            {submitting ? 'Saving…' : initial ? 'Save changes' : 'Add X Player'}
+          </button>
+          <button type="button" onClick={onCancel} className={buttonSecondary}>
             Cancel
           </button>
-        )}
-      </div>
-    </form>
+        </div>
+      </form>
+    </FormCard>
   )
 }

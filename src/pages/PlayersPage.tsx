@@ -9,6 +9,7 @@ import { RosterPanel } from '../components/RosterPanel'
 import type { Player } from '../optimizer/types'
 import type { CatalogPlayer } from '../catalog/types'
 import type { NewPlayer } from '../data/playersApi'
+import { buttonPrimary, buttonSecondary } from '../components/ui'
 
 type Mode =
   | { kind: 'closed' }
@@ -80,89 +81,111 @@ export function PlayersPage() {
   }
 
   return (
-    <div className="flex gap-6 p-6">
-      <div className="flex flex-col gap-4 flex-1">
-        <div className="flex items-center justify-between">
-          <h1 className="text-sm uppercase tracking-widest text-muted">Players</h1>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setMode({ kind: 'pick-catalog' })}
-              className="bg-text text-bg px-4 py-2 uppercase tracking-widest text-xs font-bold"
-            >
-              Add From Catalog
-            </button>
-            <button
-              onClick={() => setMode({ kind: 'x-form' })}
-              className="border border-border px-4 py-2 uppercase tracking-widest text-xs"
-            >
-              Add X Player
-            </button>
-          </div>
+    <div className="mx-auto w-full max-w-7xl px-4 py-6 font-body sm:px-6 lg:py-10">
+      <header className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4 border-b border-border pb-6">
+        <div>
+          <h1 className="font-display text-4xl uppercase leading-none tracking-wide text-text sm:text-5xl">
+            Players
+          </h1>
+          <p className="mt-3 text-sm text-muted">
+            {players.length === 1 ? '1 player' : `${players.length} players`} on your roster, priced at what
+            you own them for.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setMode({ kind: 'x-form' })}
+            className={buttonSecondary}
+          >
+            Add X Player
+          </button>
+          <button
+            onClick={() => setMode({ kind: 'pick-catalog' })}
+            className={buttonPrimary}
+          >
+            Add from catalog
+          </button>
+        </div>
+      </header>
+
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:mt-8 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-8">
+        <div className="flex min-w-0 flex-col gap-6">
+          {error && (
+            <p className="rounded-xl border border-red-400/25 bg-red-400/[0.05] px-5 py-4 text-sm text-red-300">
+              {error}
+            </p>
+          )}
+
+          {mode.kind === 'pick-catalog' && (
+            <CatalogPlayerPicker
+              catalog={catalog}
+              onSelect={(player) => setMode({ kind: 'add-catalog', player })}
+              onCancel={() => setMode({ kind: 'closed' })}
+            />
+          )}
+
+          {mode.kind === 'add-catalog' && (
+            <CatalogPlayerSalaryForm
+              key={mode.player.id}
+              name={mode.player.name}
+              positions={mode.player.positions}
+              price={mode.player.price}
+              offense={mode.player.offense}
+              defense={mode.player.defense}
+              onSubmit={(baseSalary, positions) => handleAddCatalogSubmit(mode.player, baseSalary, positions)}
+              onCancel={() => setMode({ kind: 'closed' })}
+            />
+          )}
+
+          {mode.kind === 'edit-catalog' && (
+            <CatalogPlayerSalaryForm
+              key={mode.player.id}
+              name={mode.player.name}
+              positions={mode.player.positions}
+              price={mode.player.currentSalary}
+              offense={mode.player.offense}
+              defense={mode.player.defense}
+              initialBaseSalary={mode.player.baseSalary}
+              onSubmit={(baseSalary, positions) => handleEditCatalogSubmit(mode.player, baseSalary, positions)}
+              onCancel={() => setMode({ kind: 'closed' })}
+            />
+          )}
+
+          {mode.kind === 'x-form' && (
+            <PlayerForm
+              key={mode.editing?.id ?? 'new'}
+              initial={mode.editing}
+              onSubmit={handleXSubmit}
+              onCancel={() => setMode({ kind: 'closed' })}
+            />
+          )}
+
+          {loading ? (
+            <div className="rounded-xl border border-border bg-panel px-5 py-10 text-center text-sm text-muted">
+              Loading roster…
+            </div>
+          ) : (
+            <PlayerTable
+              players={players}
+              onEdit={openEditor}
+              onDelete={handleDelete}
+              onSelect={(player) =>
+                setSelectedPlayerId((current) => (current === player.id ? null : player.id))
+              }
+              selectedId={selectedPlayerId ?? undefined}
+            />
+          )}
         </div>
 
-        {error && <p className="text-red-400 text-sm">{error}</p>}
-        {loading && <p className="text-muted text-sm">Loading...</p>}
-
-        {mode.kind === 'pick-catalog' && (
-          <CatalogPlayerPicker
-            catalog={catalog}
-            onSelect={(player) => setMode({ kind: 'add-catalog', player })}
-            onCancel={() => setMode({ kind: 'closed' })}
+        <div className="self-start lg:sticky lg:top-6">
+          <RosterPanel
+            players={players}
+            selectedPlayerId={selectedPlayerId}
+            onEdit={openEditor}
+            onDelete={handleDelete}
+            onClearSelection={() => setSelectedPlayerId(null)}
           />
-        )}
-
-        {mode.kind === 'add-catalog' && (
-          <CatalogPlayerSalaryForm
-            name={mode.player.name}
-            positions={mode.player.positions}
-            price={mode.player.price}
-            offense={mode.player.offense}
-            defense={mode.player.defense}
-            onSubmit={(baseSalary, positions) => handleAddCatalogSubmit(mode.player, baseSalary, positions)}
-            onCancel={() => setMode({ kind: 'closed' })}
-          />
-        )}
-
-        {mode.kind === 'edit-catalog' && (
-          <CatalogPlayerSalaryForm
-            name={mode.player.name}
-            positions={mode.player.positions}
-            price={mode.player.currentSalary}
-            offense={mode.player.offense}
-            defense={mode.player.defense}
-            initialBaseSalary={mode.player.baseSalary}
-            onSubmit={(baseSalary, positions) => handleEditCatalogSubmit(mode.player, baseSalary, positions)}
-            onCancel={() => setMode({ kind: 'closed' })}
-          />
-        )}
-
-        {mode.kind === 'x-form' && (
-          <PlayerForm
-            initial={mode.editing}
-            onSubmit={handleXSubmit}
-            onCancel={() => setMode({ kind: 'closed' })}
-          />
-        )}
-
-        <PlayerTable
-          players={players}
-          onEdit={openEditor}
-          onDelete={handleDelete}
-          onSelect={(player) =>
-            setSelectedPlayerId((current) => (current === player.id ? null : player.id))
-          }
-          selectedId={selectedPlayerId ?? undefined}
-        />
-      </div>
-
-      <div className="flex-1">
-        <RosterPanel
-          players={players}
-          selectedPlayerId={selectedPlayerId}
-          onEdit={openEditor}
-          onDelete={handleDelete}
-          onClearSelection={() => setSelectedPlayerId(null)}
-        />
+        </div>
       </div>
     </div>
   )
