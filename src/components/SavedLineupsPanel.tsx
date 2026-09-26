@@ -1,7 +1,8 @@
 import { useState, type KeyboardEvent } from 'react'
 import type { SavedLineup } from '../data/lineupsApi'
 import { summarizeSavedLineup } from '../optimizer/summarizeSavedLineup'
-import { X_TIERS } from '../optimizer/types'
+import { POSITIONS } from '../optimizer/types'
+import { Eyebrow, SlotRow } from './LineupParts'
 
 interface SavedLineupsPanelProps {
   lineups: SavedLineup[]
@@ -19,6 +20,15 @@ function formatSavedAt(iso: string): string {
     hour: 'numeric',
     minute: '2-digit',
   })
+}
+
+function Total({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-[11px] text-muted">{label}</span>
+      <span className="font-mono text-sm tabular-nums text-text">{value}</span>
+    </div>
+  )
 }
 
 function SavedLineupCard({
@@ -50,17 +60,18 @@ function SavedLineupCard({
   }
 
   return (
-    <div className="border border-border bg-panel p-3 flex flex-col gap-2">
-      <div className="flex justify-between items-start gap-2">
-        <div className="flex flex-col gap-0.5 min-w-0">
+    <article className="group rounded-xl border border-border bg-panel">
+      <header className="flex items-start justify-between gap-2 px-4 pt-4">
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           {editing ? (
             <input
               autoFocus
+              aria-label="Lineup name"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onBlur={commit}
               onKeyDown={handleKeyDown}
-              className="bg-bg border border-border px-2 py-1 text-text text-sm"
+              className="-mx-1.5 rounded-md border border-accent/60 bg-bg px-1.5 py-0.5 text-[15px] font-medium text-text focus:outline-none"
             />
           ) : (
             <button
@@ -68,70 +79,86 @@ function SavedLineupCard({
                 setDraft(lineup.title)
                 setEditing(true)
               }}
-              className="text-sm text-text text-left uppercase tracking-widest truncate"
-              title="Rename"
+              className="-mx-1.5 flex min-w-0 items-center gap-1.5 rounded-md px-1.5 py-0.5 text-left text-[15px] font-medium text-text hover:bg-white/[0.04] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+              title="Rename lineup"
             >
-              {lineup.title || 'Untitled'}
+              <span className="truncate">{lineup.title || 'Untitled'}</span>
+              <svg
+                viewBox="0 0 16 16"
+                className="h-3 w-3 shrink-0 text-muted opacity-0 transition-opacity group-hover:opacity-100"
+                fill="none"
+                aria-hidden
+              >
+                <path d="M11 2.5 13.5 5 6 12.5H3.5V10L11 2.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+              </svg>
             </button>
           )}
-          <span className="text-xs uppercase tracking-widest text-muted">
-            {formatSavedAt(lineup.createdAt)}
-          </span>
+          <span className="text-xs text-muted">{formatSavedAt(lineup.createdAt)}</span>
         </div>
         <button
           onClick={() => onDelete(lineup.id)}
-          className="text-red-400 shrink-0"
-          aria-label="Delete saved lineup"
+          className="-mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-red-400/10 hover:text-red-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-400"
+          aria-label={`Delete ${lineup.title || 'saved lineup'}`}
+          title="Delete lineup"
         >
-          &times;
+          <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" aria-hidden>
+            <path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8.5h5.8l.6-8.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
         </button>
-      </div>
+      </header>
 
-      {lineup.slots.map((slot) => (
-        <div key={slot.position} className="flex justify-between text-sm">
-          <span className="text-muted uppercase tracking-widest">
-            {slot.position}
-            {slot.isXPlayer ? ` (${X_TIERS[slot.xTier ?? 'standard'].shortLabel})` : ''}
-          </span>
-          <span>{slot.name}</span>
-          <span>{slot.baseSalary}</span>
-        </div>
-      ))}
+      <ul className="mt-2 divide-y divide-white/[0.05] px-4">
+        {[...lineup.slots]
+          .sort((a, b) => POSITIONS.indexOf(a.position) - POSITIONS.indexOf(b.position))
+          .map((slot) => (
+          <SlotRow
+            key={slot.position}
+            size="sm"
+            slot={{
+              position: slot.position,
+              name: slot.name,
+              xTier: slot.isXPlayer ? (slot.xTier ?? 'standard') : null,
+              salary: slot.baseSalary,
+              offense: slot.offense,
+              defense: slot.defense,
+            }}
+          />
+        ))}
+      </ul>
 
-      <div className="border-t border-border pt-3 flex justify-between text-xs uppercase tracking-widest text-muted">
-        <span>TPower by Salary w/o kits</span>
-        <span>{totals.totalPowerBySal}</span>
+      <div className="mt-2 grid grid-cols-4 gap-2 border-t border-border px-4 py-3">
+        <Total label="Base" value={totals.totalBaseSalary} />
+        <Total label="TPower" value={totals.totalPowerBySal} />
+        <Total label="Off" value={totals.totalOffense} />
+        <Total label="Def" value={totals.totalDefense} />
       </div>
-      <div className="flex justify-between text-xs uppercase tracking-widest text-muted">
-        <span>Total Base Salary</span>
-        <span>{totals.totalBaseSalary}</span>
-      </div>
-      <div className="flex justify-between text-xs uppercase tracking-widest text-muted">
-        <span>Total Offense</span>
-        <span>{totals.totalOffense}</span>
-      </div>
-      <div className="flex justify-between text-xs uppercase tracking-widest text-muted">
-        <span>Total Defense</span>
-        <span>{totals.totalDefense}</span>
-      </div>
-    </div>
+    </article>
   )
 }
 
 export function SavedLineupsPanel({ lineups, error, onRename, onDelete }: SavedLineupsPanelProps) {
   return (
-    <div className="flex flex-col gap-4 pt-2">
-      <h2 className="text-sm uppercase tracking-widest text-muted">Saved Lineups</h2>
+    <section className="flex flex-col gap-3">
+      <div className="flex items-baseline justify-between">
+        <Eyebrow>Saved lineups</Eyebrow>
+        {lineups.length > 0 && (
+          <span className="font-mono text-xs tabular-nums text-muted">{lineups.length}</span>
+        )}
+      </div>
 
-      {error && <p className="text-red-400 text-sm">{error}</p>}
+      {error && <p className="text-sm text-red-400">{error}</p>}
 
-      {lineups.length === 0 && !error && <p className="text-muted text-sm">No saved lineups yet.</p>}
+      {lineups.length === 0 && !error && (
+        <p className="rounded-xl border border-dashed border-border px-4 py-5 text-sm text-muted">
+          No saved lineups yet. Save a calculated lineup to lock its players out of the next one.
+        </p>
+      )}
 
       <div className="flex flex-col gap-3">
         {lineups.map((lineup) => (
           <SavedLineupCard key={lineup.id} lineup={lineup} onRename={onRename} onDelete={onDelete} />
         ))}
       </div>
-    </div>
+    </section>
   )
 }
