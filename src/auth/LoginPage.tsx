@@ -2,6 +2,8 @@ import { useState, type FormEvent } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from './AuthContext'
 import { GoogleSignInButton } from './GoogleSignInButton'
+import { AuthDivider, AuthLayout } from './AuthLayout'
+import { Field, buttonSecondary, inputClass } from '../components/ui'
 
 export function LoginPage() {
   const { signIn, session } = useAuth()
@@ -27,54 +29,55 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-bg text-text">
-      <form onSubmit={handleSubmit} className="border border-border bg-panel p-6 flex flex-col gap-3 w-80">
-        <h1 className="text-sm uppercase tracking-widest text-muted">Sign In</h1>
+    <AuthLayout
+      title="Sign in to Six Man"
+      subtitle="Pick up where you left off with your roster and saved lineups."
+      footer={
+        <Link to="/" className="transition-colors hover:text-text">
+          ← Back to home
+        </Link>
+      }
+    >
+      <GoogleSignInButton />
 
-        <GoogleSignInButton />
+      <AuthDivider label="or sign in with email" />
 
-        <p className="text-xs text-muted text-center uppercase tracking-widest">or with email</p>
-
-        <label className="flex flex-col gap-1 text-xs uppercase tracking-widest text-muted">
-          Email
+      <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+        <Field label="Email" htmlFor="email">
           <input
+            id="email"
             type="email"
-            className="bg-bg border border-border px-2 py-1 text-text"
+            autoComplete="email"
+            className={`${inputClass} py-2.5`}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
           />
-        </label>
+        </Field>
 
-        <label className="flex flex-col gap-1 text-xs uppercase tracking-widest text-muted">
-          Password
+        <Field label="Password" htmlFor="password">
           <input
+            id="password"
             type="password"
-            className="bg-bg border border-border px-2 py-1 text-text"
+            autoComplete="current-password"
+            className={`${inputClass} py-2.5`}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
             minLength={6}
           />
-        </label>
+        </Field>
 
-        {error && <p className="text-red-400 text-xs">{error}</p>}
+        {error && (
+          <p role="alert" className="rounded-md border border-red-400/25 bg-red-400/[0.06] px-3 py-2 text-sm text-red-300">
+            {error}
+          </p>
+        )}
 
-        <button
-          type="submit"
-          disabled={submitting}
-          className="border border-border px-4 py-2 uppercase tracking-widest text-xs font-bold disabled:opacity-50"
-        >
-          Sign In
+        <button type="submit" disabled={submitting} className={`${buttonSecondary} w-full py-2.5`}>
+          {submitting ? 'Signing in…' : 'Sign in'}
         </button>
-
-        <p className="text-xs text-muted">
-          No account?{' '}
-          <Link to="/signup" className="text-accent uppercase tracking-widest">
-            Sign Up
-          </Link>
-        </p>
       </form>
-    </div>
+    </AuthLayout>
   )
 }

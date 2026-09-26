@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from './AuthContext'
+import { AuthLayout } from './AuthLayout'
+import { Field, buttonPrimary, inputClass } from '../components/ui'
 
 const USERNAME_PATTERN = /^[A-Za-z0-9_]{3,20}$/
 
@@ -33,41 +35,45 @@ export function WelcomePage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-bg text-text">
-      <form onSubmit={handleSubmit} className="border border-border bg-panel p-6 flex flex-col gap-3 w-80">
-        <h1 className="text-sm uppercase tracking-widest text-muted">Welcome</h1>
-        <p className="text-xs text-muted">
-          Signed in as <span className="text-text">{session.user.email}</span>. Choose a username to finish
+    <AuthLayout
+      title="Choose a username"
+      subtitle={
+        <>
+          Signed in as <span className="text-text">{session.user.email}</span>. Pick a username to finish
           setting up.
-        </p>
-
-        <label className="flex flex-col gap-1 text-xs uppercase tracking-widest text-muted">
-          Username
+        </>
+      }
+      footer={
+        <button type="button" onClick={signOut} className="transition-colors hover:text-text">
+          Not you? Sign out
+        </button>
+      }
+    >
+      <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+        <Field label="Username" htmlFor="username" hint="3–20 characters: letters, numbers or underscores.">
           <input
-            className="bg-bg border border-border px-2 py-1 text-text normal-case tracking-normal"
+            id="username"
+            className={`${inputClass} py-2.5`}
             value={value}
             onChange={(e) => setValue(e.target.value)}
             required
             minLength={3}
             maxLength={20}
+            autoComplete="username"
             autoFocus
           />
-        </label>
+        </Field>
 
-        {error && <p className="text-red-400 text-xs">{error}</p>}
+        {error && (
+          <p role="alert" className="rounded-md border border-red-400/25 bg-red-400/[0.06] px-3 py-2 text-sm text-red-300">
+            {error}
+          </p>
+        )}
 
-        <button
-          type="submit"
-          disabled={submitting}
-          className="bg-text text-bg px-4 py-2 uppercase tracking-widest text-xs font-bold disabled:opacity-50"
-        >
-          Continue
-        </button>
-
-        <button type="button" onClick={signOut} className="text-xs text-muted uppercase tracking-widest">
-          Sign out
+        <button type="submit" disabled={submitting} className={`${buttonPrimary} w-full py-2.5`}>
+          {submitting ? 'Saving…' : 'Continue'}
         </button>
       </form>
-    </div>
+    </AuthLayout>
   )
 }
