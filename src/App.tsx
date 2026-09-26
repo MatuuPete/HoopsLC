@@ -10,6 +10,7 @@ import { AppLayout } from './components/AppLayout'
 import { PlayersPage } from './pages/PlayersPage'
 import { LineupBuilderPage } from './pages/LineupBuilderPage'
 import { AdminCatalogPage } from './pages/AdminCatalogPage'
+import { GuidePage } from './pages/GuidePage'
 
 function App() {
   return (
@@ -29,6 +30,7 @@ function App() {
           >
             <Route path="/players" element={<PlayersPage />} />
             <Route path="/lineup" element={<LineupBuilderPage />} />
+            <Route path="/guide" element={<GuidePage />} />
             <Route
               path="/admin/catalog"
               element={

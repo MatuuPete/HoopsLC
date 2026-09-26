@@ -5,6 +5,7 @@ import { Logo } from './Logo'
 const baseLinks = [
   { to: '/players', label: 'Players' },
   { to: '/lineup', label: 'Lineup Builder' },
+  { to: '/guide', label: 'How It Works' },
 ]
 
 export function NavBar() {
