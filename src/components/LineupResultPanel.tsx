@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { awardFor, effectiveDefense, effectiveOffense } from '../optimizer/awards'
 import { POSITIONS, type LineupResult, type LineupSlot, type Player } from '../optimizer/types'
 import { CapStack, Eyebrow, SlotRow, Stat, type SlotView } from './LineupParts'
 
@@ -8,21 +9,25 @@ function toSlotView(slot: LineupSlot): SlotView {
     name: slot.player.name,
     xTier: slot.player.xTier,
     salary: slot.player.baseSalary,
-    offense: slot.player.offense,
-    defense: slot.player.defense,
+    offense: effectiveOffense(slot.player),
+    defense: effectiveDefense(slot.player),
+    award: awardFor(slot.player.name),
   }
 }
 
 function sumOffense(slots: LineupSlot[]): number {
-  return slots.reduce((sum, slot) => sum + slot.player.offense, 0)
+  return slots.reduce((sum, slot) => sum + effectiveOffense(slot.player), 0)
 }
 
 function sumDefense(slots: LineupSlot[]): number {
-  return slots.reduce((sum, slot) => sum + slot.player.defense, 0)
+  return slots.reduce((sum, slot) => sum + effectiveDefense(slot.player), 0)
 }
 
 function sumStatPower(slots: LineupSlot[]): number {
-  return slots.reduce((sum, slot) => sum + slot.player.offense + slot.player.defense, 0)
+  return slots.reduce(
+    (sum, slot) => sum + effectiveOffense(slot.player) + effectiveDefense(slot.player),
+    0,
+  )
 }
 
 function sumCurrentSalary(slots: LineupSlot[]): number {
@@ -114,7 +119,8 @@ function LineupCard({
         <Stat label="TPower · stats" value={sumStatPower(slots)} />
       </div>
       <p className="border-t border-border px-5 py-3 text-[11px] text-muted">
-        TPower totals exclude kits. Salaries shown are what you own each player at.
+        Offense and defense include award bonuses. TPower totals exclude kits. Salaries shown are
+        what you own each player at.
       </p>
     </section>
   )

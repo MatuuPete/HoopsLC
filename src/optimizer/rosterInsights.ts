@@ -1,5 +1,6 @@
 import type { Player, Position } from './types'
 import { POSITIONS } from './types'
+import { effectiveDefense, effectiveOffense } from './awards'
 
 export interface CoverageEntry {
   position: Position
@@ -20,14 +21,14 @@ export interface ValueEntry {
 }
 
 /**
- * Players ranked by power (offense + defense) per current-salary dollar, best
+ * Players ranked by power (offense + defense, with award bonuses) per current-salary dollar, best
  * value first. X players are excluded: their salary is fixed at 999, so the
  * ratio is meaninglessly large and would always top the list.
  */
 export function valueRanking(players: Player[]): ValueEntry[] {
   return players
     .filter((p) => !p.isXPlayer && p.currentSalary > 0)
-    .map((p) => ({ player: p, value: (p.offense + p.defense) / p.currentSalary }))
+    .map((p) => ({ player: p, value: (effectiveOffense(p) + effectiveDefense(p)) / p.currentSalary }))
     .sort((a, b) => b.value - a.value)
 }
 

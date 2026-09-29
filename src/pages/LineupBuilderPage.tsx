@@ -4,11 +4,18 @@ import { useSettings } from '../data/useSettings'
 import { useLineups } from '../data/useLineups'
 import { findBestLineup } from '../optimizer/findBestLineup'
 import { lockedPlayerIds } from '../optimizer/lockedPlayerIds'
+import { awardFor, effectiveDefense, effectiveOffense, type Award } from '../optimizer/awards'
 import type { LineupResult } from '../optimizer/types'
 import { LineupResultPanel, LineupResultPlaceholder } from '../components/LineupResultPanel'
 import { SavedLineupsPanel } from '../components/SavedLineupsPanel'
 import { PlayerChecklist } from '../components/PlayerChecklist'
 import { Eyebrow } from '../components/LineupParts'
+
+/** The award goes into a saved slot only when the player has one. */
+function awardField(name: string): { award?: Award } {
+  const award = awardFor(name)
+  return award ? { award } : {}
+}
 
 export function LineupBuilderPage() {
   const { players } = usePlayers()
@@ -87,8 +94,9 @@ export function LineupBuilderPage() {
         ...(slot.player.xTier ? { xTier: slot.player.xTier } : {}),
         currentSalary: slot.player.currentSalary,
         baseSalary: slot.player.baseSalary,
-        offense: slot.player.offense,
-        defense: slot.player.defense,
+        offense: effectiveOffense(slot.player),
+        defense: effectiveDefense(slot.player),
+        ...awardField(slot.player.name),
       })),
       `Lineup ${nextCount}`,
     )

@@ -1,3 +1,5 @@
+import type { Award } from './awards'
+
 export type Position = 'PG' | 'SG' | 'SF' | 'PF' | 'C'
 
 export const POSITIONS: Position[] = ['PG', 'SG', 'SF', 'PF', 'C']
@@ -48,8 +50,11 @@ export interface SavedLineupSlot {
   xTier?: XTier
   currentSalary: number
   baseSalary: number
+  /** Offense and defense include any award bonus the player had at save time. */
   offense: number
   defense: number
+  /** Absent when the player had no award, or on lineups saved before awards existed. */
+  award?: Award
 }
 
 export type ObjectiveMode = 'power' | 'stats'

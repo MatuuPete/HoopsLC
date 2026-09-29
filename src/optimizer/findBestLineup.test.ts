@@ -24,6 +24,22 @@ function makePlayer(overrides: Partial<Player> & Pick<Player, 'id' | 'positions'
 }
 
 describe('findBestLineup', () => {
+  it('counts award bonuses toward stats-mode value', () => {
+    // Two PGs with identical raw stats and salary; only one has an award (MVP, +10 OFF / +5 DEF).
+    const players: Player[] = [
+      makePlayer({ id: 'a-plain', name: 'Plain Guard', positions: ['PG'] }),
+      makePlayer({ id: 'z-mvp', name: 'Shai Gilgeous-Alexander', positions: ['PG'] }),
+      makePlayer({ id: 'sg', positions: ['SG'], isXPlayer: true }),
+      makePlayer({ id: 'sf', positions: ['SF'] }),
+      makePlayer({ id: 'pf', positions: ['PF'] }),
+      makePlayer({ id: 'c', positions: ['C'] }),
+    ]
+    const result = findBestLineup(players, 10000, { ...DEFAULT_PREFERENCES, objectiveMode: 'stats' })
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.slots.find((s) => s.position === 'PG')?.player.id).toBe('z-mvp')
+  })
+
   it('requires exactly one X Player and picks the best position for it', () => {
     const players: Player[] = [
       makePlayer({ id: 'pg-1', positions: ['PG'], baseSalary: 100, currentSalary: 100 }),

@@ -121,6 +121,7 @@ function SavedLineupCard({
               salary: slot.baseSalary,
               offense: slot.offense,
               defense: slot.defense,
+              award: slot.award ?? null,
             }}
           />
         ))}

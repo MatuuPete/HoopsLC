@@ -40,6 +40,11 @@ const STEPS: Step[] = [
           update on their own whenever the catalog is refreshed. The only number you keep up to date is
           base salary.
         </p>
+        <p>
+          Players who won a season award, such as MVP or Rookie of the Year, get a green award badge and
+          a bonus to offense and/or defense. Hover the badge to see the bonus. It's added to their
+          stats everywhere, including the lineup totals.
+        </p>
       </>
     ),
   },
@@ -81,8 +86,8 @@ const STEPS: Step[] = [
           </li>
           <li>
             <Ui>Optimize for</Ui>: <Ui>Max power</Ui> picks the five with the highest combined salary
-            power. <Ui>Stats</Ui> picks the best offense and defense instead. Drag the slider toward the
-            side you care about more.
+            power. <Ui>Stats</Ui> picks the best offense and defense instead, counting award bonuses. Drag
+            the slider toward the side you care about more.
           </li>
           <li>
             <Ui>Preferred players</Ui>: tick anyone you want in the lineup. They're kept in whenever

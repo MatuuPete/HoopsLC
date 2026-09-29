@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { awardFor, effectiveDefense, effectiveOffense } from '../optimizer/awards'
 import { X_TIERS, type Player } from '../optimizer/types'
 import {
   positionalCoverage,
@@ -6,7 +7,7 @@ import {
   salaryMovers,
   playerValueRank,
 } from '../optimizer/rosterInsights'
-import { Eyebrow, TierBadge } from './LineupParts'
+import { AwardBadge, Eyebrow, TierBadge } from './LineupParts'
 import { buttonDanger, buttonSecondary } from './ui'
 
 interface RosterPanelProps {
@@ -86,7 +87,10 @@ function InspectorStat({ label, value, tone }: { label: string; value: ReactNode
 
 function PlayerInspector({ player, players, onEdit, onDelete, onBack }: PlayerInspectorProps) {
   const change = player.currentSalary - player.baseSalary
-  const power = player.offense + player.defense
+  const award = awardFor(player.name)
+  const offense = effectiveOffense(player)
+  const defense = effectiveDefense(player)
+  const power = offense + defense
   const rank = playerValueRank(players, player.id)
 
   return (
@@ -105,11 +109,17 @@ function PlayerInspector({ player, players, onEdit, onDelete, onBack }: PlayerIn
           <div className="flex min-w-0 items-center gap-2">
             <h2 className="truncate text-xl font-medium text-text">{player.name}</h2>
             {player.xTier && <TierBadge tier={player.xTier} />}
+            {award && <AwardBadge award={award} />}
           </div>
           <span className="font-mono text-xs text-muted">
             {player.positions.join(' / ')}
             {player.xTier ? ` · ${X_TIERS[player.xTier].label}` : ''}
           </span>
+          {award && (
+            <span className="text-xs text-accent">
+              {award.award}: +{award.offense} OFF / +{award.defense} DEF
+            </span>
+          )}
         </div>
       </div>
 
@@ -121,8 +131,8 @@ function PlayerInspector({ player, players, onEdit, onDelete, onBack }: PlayerIn
           value={change === 0 ? '0' : signed(change)}
           tone={change > 0 ? 'text-accent' : change < 0 ? 'text-red-400' : undefined}
         />
-        <InspectorStat label="Offense" value={player.offense} />
-        <InspectorStat label="Defense" value={player.defense} />
+        <InspectorStat label="Offense" value={offense} />
+        <InspectorStat label="Defense" value={defense} />
         <InspectorStat label="Power" value={power} />
       </div>
 

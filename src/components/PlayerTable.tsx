@@ -1,6 +1,7 @@
 import { useState } from 'react'
+import { awardFor } from '../optimizer/awards'
 import type { Player, Position } from '../optimizer/types'
-import { TierBadge } from './LineupParts'
+import { AwardBadge, TierBadge } from './LineupParts'
 import { IconButton, PositionFilter, SearchInput, pencilPath, trashPath } from './ui'
 
 interface PlayerTableProps {
@@ -24,6 +25,12 @@ function SalaryChange({ player }: { player: Player }) {
       {delta}
     </span>
   )
+}
+
+/** The award bonus on top of a catalog stat, e.g. "+10". */
+function AwardBonus({ bonus }: { bonus: number | undefined }) {
+  if (!bonus) return null
+  return <span className="ml-2 text-[11px] text-accent">+{bonus}</span>
 }
 
 export function PlayerTable({ players, onEdit, onDelete, onSelect, selectedId }: PlayerTableProps) {
@@ -66,6 +73,7 @@ export function PlayerTable({ players, onEdit, onDelete, onSelect, selectedId }:
           <tbody>
             {visible.map((p) => {
               const selected = p.id === selectedId
+              const award = awardFor(p.name)
               return (
                 <tr
                   key={p.id}
@@ -95,6 +103,7 @@ export function PlayerTable({ players, onEdit, onDelete, onSelect, selectedId }:
                         <span className="truncate font-medium text-text">{p.name}</span>
                       )}
                       {p.xTier && <TierBadge tier={p.xTier} />}
+                      {award && <AwardBadge award={award} />}
                     </span>
                   </td>
                   <td className="px-4 py-3 font-mono text-xs text-muted">{p.positions.join('/')}</td>
@@ -103,8 +112,14 @@ export function PlayerTable({ players, onEdit, onDelete, onSelect, selectedId }:
                     {p.currentSalary}
                     <SalaryChange player={p} />
                   </td>
-                  <td className={`${numCell} text-text`}>{p.offense}</td>
-                  <td className={`${numCell} text-text`}>{p.defense}</td>
+                  <td className={`${numCell} text-text`}>
+                    {p.offense}
+                    <AwardBonus bonus={award?.offense} />
+                  </td>
+                  <td className={`${numCell} text-text`}>
+                    {p.defense}
+                    <AwardBonus bonus={award?.defense} />
+                  </td>
                   <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                     <span className="flex justify-end gap-0.5 opacity-60 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
                       <IconButton label={`Edit ${p.name}`} onClick={() => onEdit(p)}>

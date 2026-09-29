@@ -6,6 +6,7 @@ import {
   type Player,
   type Position,
 } from './types'
+import { effectiveDefense, effectiveOffense } from './awards'
 
 const CENTS = 100
 const STAT_SCALE = 1000
@@ -20,7 +21,7 @@ function computeValue(player: Player, preferences: LineupPreferences): number {
   }
   const offenseScale = Math.round(preferences.offenseWeight * STAT_SCALE)
   const defenseScale = STAT_SCALE - offenseScale
-  return offenseScale * player.offense + defenseScale * player.defense
+  return offenseScale * effectiveOffense(player) + defenseScale * effectiveDefense(player)
 }
 
 function slotBit(position: Position): number {
