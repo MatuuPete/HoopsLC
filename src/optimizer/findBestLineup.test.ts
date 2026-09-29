@@ -9,21 +9,46 @@ const DEFAULT_PREFERENCES: LineupPreferences = {
   offenseWeight: 0.5,
 }
 
+/**
+ * Unless a test sets offense/defense itself, a player's power (offense +
+ * defense) equals its currentSalary, so fixtures can use currentSalary as a
+ * single "strength" number for power-mode tests.
+ */
 function makePlayer(overrides: Partial<Player> & Pick<Player, 'id' | 'positions'>): Player {
+  const currentSalary = overrides.currentSalary ?? 100
   return {
     name: overrides.id,
     isXPlayer: false,
     xTier: null,
     baseSalary: 100,
-    currentSalary: 100,
-    offense: 50,
-    defense: 50,
+    currentSalary,
+    offense: currentSalary / 2,
+    defense: currentSalary / 2,
     catalogPlayerId: null,
     ...overrides,
   }
 }
 
 describe('findBestLineup', () => {
+  it('ranks by total power (offense + defense + awards) in power mode, not by salary', () => {
+    const players: Player[] = [
+      makePlayer({ id: 'pg-pricey', positions: ['PG'], currentSalary: 900, offense: 100, defense: 50 }),
+      makePlayer({ id: 'pg-strong', positions: ['PG'], currentSalary: 200, offense: 150, defense: 50 }),
+      makePlayer({ id: 'sg-x', positions: ['SG'], isXPlayer: true }),
+      makePlayer({ id: 'sf-rich', positions: ['SF'], currentSalary: 900, offense: 100, defense: 100 }),
+      // 100 + 95 raw, plus the Rookie of the Year bonus (+5/+5) = 205.
+      makePlayer({ id: 'sf-roy', name: 'Cooper Flagg', positions: ['SF'], currentSalary: 200, offense: 100, defense: 95 }),
+      makePlayer({ id: 'pf', positions: ['PF'] }),
+      makePlayer({ id: 'c', positions: ['C'] }),
+    ]
+    const result = findBestLineup(players, 10000, DEFAULT_PREFERENCES)
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    const ids = result.slots.map((s) => s.player.id)
+    expect(ids).toContain('pg-strong')
+    expect(ids).toContain('sf-roy')
+  })
+
   it('counts award bonuses toward stats-mode value', () => {
     // Two PGs with identical raw stats and salary; only one has an award (MVP, +10 OFF / +5 DEF).
     const players: Player[] = [

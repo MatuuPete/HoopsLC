@@ -85,9 +85,9 @@ const STEPS: Step[] = [
             <Ui>Salary cap</Ui>: the most base salary your five players can add up to.
           </li>
           <li>
-            <Ui>Optimize for</Ui>: <Ui>Max power</Ui> picks the five with the highest combined salary
-            power. <Ui>Stats</Ui> picks the best offense and defense instead, counting award bonuses. Drag
-            the slider toward the side you care about more.
+            <Ui>Optimize for</Ui>: <Ui>Max power</Ui> picks the five with the highest total power:
+            offense plus defense, award bonuses included. Salary only matters as the cap limit.{' '}
+            <Ui>Stats</Ui> does the same but lets you weight offense against defense with the slider.
           </li>
           <li>
             <Ui>Preferred players</Ui>: tick anyone you want in the lineup. They're kept in whenever
@@ -158,8 +158,8 @@ const RULES = [
 const TERMS: { term: string; meaning: string }[] = [
   { term: 'Base salary', meaning: 'The price you own a player at. You enter it, and it counts against your cap.' },
   { term: 'Current salary', meaning: "The player's catalog price today. It updates on its own when the catalog is refreshed." },
-  { term: 'TPower · salary', meaning: 'The five current salaries added together. This is what Max power makes as high as possible.' },
-  { term: 'TPower · stats', meaning: 'Offense plus defense for all five players.' },
+  { term: 'TPower · salary', meaning: 'The five current salaries added together.' },
+  { term: 'TPower · stats', meaning: 'Offense plus defense for all five players, award bonuses included. This is what Max power makes as high as possible.' },
   { term: 'Without kits', meaning: 'Totals in the app never include kit boosts.' },
   { term: 'Value', meaning: 'Offense plus defense divided by current salary. Higher means more stats for the money.' },
 ]

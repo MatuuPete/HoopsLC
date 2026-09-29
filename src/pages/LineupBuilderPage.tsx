@@ -179,7 +179,7 @@ export function LineupBuilderPage() {
               </div>
               <p className="text-xs leading-relaxed text-muted">
                 {objectiveMode === 'power'
-                  ? 'Picks the five with the highest combined salary power.'
+                  ? 'Picks the five with the highest total power: offense plus defense, award bonuses included.'
                   : 'Picks the five with the best offense and defense, weighted by the slider.'}
               </p>
 

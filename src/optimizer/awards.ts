@@ -11,9 +11,9 @@ export interface Award {
 /**
  * Season awards and the stat bonus each one grants. Bonuses stack on top of
  * a player's catalog offense/defense everywhere stats are totalled, and in
- * Stats-mode lineup optimization. Max power mode ranks by salary and ignores
- * them. Keyed by lower-cased player name so catalog and hand-entered players
- * both match; update this table when the awards change.
+ * both lineup optimization modes. Keyed by lower-cased player name so catalog
+ * and hand-entered players both match; update this table when the awards
+ * change.
  */
 const AWARDS: Record<string, Award> = {
   'shai gilgeous-alexander': { award: 'MVP', short: 'MVP', offense: 10, defense: 5 },

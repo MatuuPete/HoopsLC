@@ -17,7 +17,7 @@ function toCents(amount: number): number {
 
 function computeValue(player: Player, preferences: LineupPreferences): number {
   if (preferences.objectiveMode === 'power') {
-    return toCents(player.currentSalary)
+    return STAT_SCALE * (effectiveOffense(player) + effectiveDefense(player))
   }
   const offenseScale = Math.round(preferences.offenseWeight * STAT_SCALE)
   const defenseScale = STAT_SCALE - offenseScale
