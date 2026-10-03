@@ -10,6 +10,7 @@ import { LineupResultPanel, LineupResultPlaceholder } from '../components/Lineup
 import { SavedLineupsPanel } from '../components/SavedLineupsPanel'
 import { PlayerChecklist } from '../components/PlayerChecklist'
 import { Eyebrow, Switch } from '../components/LineupParts'
+import { SalaryCapField } from '../components/SalaryCapField'
 
 /** The award goes into a saved slot only when the player has one. */
 function awardField(name: string): { award?: Award } {
@@ -36,6 +37,8 @@ export function LineupBuilderPage() {
     updateBenchEnabled,
     benchSize,
     updateBenchSize,
+    preferredBenchPlayerIds,
+    updatePreferredBenchPlayerIds,
   } = useSettings()
   const { lineups, error: lineupsError, saveLineup, renameLineup, removeLineup } = useLineups()
   const [capInput, setCapInput] = useState(salaryCap)
@@ -46,6 +49,7 @@ export function LineupBuilderPage() {
   const [resultId, setResultId] = useState(0)
   const [preferredSearch, setPreferredSearch] = useState('')
   const [unavailableSearch, setUnavailableSearch] = useState('')
+  const [benchSearch, setBenchSearch] = useState('')
   const [showUnavailable, setShowUnavailable] = useState(false)
 
   // Players already committed to a saved lineup are locked out of new ones.
@@ -83,6 +87,7 @@ export function LineupBuilderPage() {
         objectiveMode,
         offenseWeight,
         benchSize: activeBenchSize,
+        preferredBenchPlayerIds,
       }),
     )
   }
@@ -124,11 +129,26 @@ export function LineupBuilderPage() {
     await updateSalaryCap(value)
   }
 
+  // A player is preferred for the starting five or the bench, never both:
+  // ticking one list unticks the other.
   function toggleRequired(playerId: string) {
-    const next = requiredPlayerIds.includes(playerId)
-      ? requiredPlayerIds.filter((id) => id !== playerId)
-      : [...requiredPlayerIds, playerId]
+    const adding = !requiredPlayerIds.includes(playerId)
+    const next = adding ? [...requiredPlayerIds, playerId] : requiredPlayerIds.filter((id) => id !== playerId)
     updateRequiredPlayerIds(next)
+    if (adding && preferredBenchPlayerIds.includes(playerId)) {
+      updatePreferredBenchPlayerIds(preferredBenchPlayerIds.filter((id) => id !== playerId))
+    }
+  }
+
+  function togglePreferredBench(playerId: string) {
+    const adding = !preferredBenchPlayerIds.includes(playerId)
+    const next = adding
+      ? [...preferredBenchPlayerIds, playerId]
+      : preferredBenchPlayerIds.filter((id) => id !== playerId)
+    updatePreferredBenchPlayerIds(next)
+    if (adding && requiredPlayerIds.includes(playerId)) {
+      updateRequiredPlayerIds(requiredPlayerIds.filter((id) => id !== playerId))
+    }
   }
 
   function toggleUnavailable(playerId: string) {
@@ -140,6 +160,9 @@ export function LineupBuilderPage() {
 
   const activeBenchSize = benchEnabled ? benchSize : 0
   const requiredCount = availablePlayers.filter((p) => requiredPlayerIds.includes(p.id)).length
+  // X Players can't sit on the bench, so they aren't offered here.
+  const benchCandidates = availablePlayers.filter((p) => !p.isXPlayer)
+  const preferredBenchCount = benchCandidates.filter((p) => preferredBenchPlayerIds.includes(p.id)).length
   const offensePct = Math.round(offenseWeight * 100)
 
   return (
@@ -171,14 +194,7 @@ export function LineupBuilderPage() {
               <label htmlFor="salary-cap">
                 <Eyebrow>Salary cap</Eyebrow>
               </label>
-              <input
-                id="salary-cap"
-                type="number"
-                inputMode="numeric"
-                className="w-full rounded-md border border-border bg-bg px-3 py-2 font-mono text-lg tabular-nums text-text transition-colors [appearance:textfield] focus:border-accent/60 focus:outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                value={capInput}
-                onChange={(e) => handleCapChange(Number(e.target.value))}
-              />
+              <SalaryCapField id="salary-cap" value={capInput} onCommit={handleCapChange} />
             </div>
 
             <div className="flex flex-col gap-3 p-5">
@@ -259,6 +275,31 @@ export function LineupBuilderPage() {
                       </SegmentButton>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {benchEnabled && (
+                <div className="flex flex-col gap-2 border-t border-white/[0.05] pt-4">
+                  <div className="flex items-baseline justify-between gap-3 text-xs">
+                    <span className="text-muted">Preferred bench players</span>
+                    {preferredBenchCount > 0 && (
+                      <span className={preferredBenchCount > benchSize ? 'text-red-400' : 'text-accent'}>
+                        {preferredBenchCount} of {benchSize} spots
+                      </span>
+                    )}
+                  </div>
+                  <p className="-mt-1 text-xs text-muted">
+                    Kept on the bench whenever they fit. Any spots left go to the strongest players.
+                  </p>
+                  <PlayerChecklist
+                    label="Preferred bench players"
+                    players={benchCandidates}
+                    selectedIds={preferredBenchPlayerIds}
+                    search={benchSearch}
+                    onSearchChange={setBenchSearch}
+                    onToggle={togglePreferredBench}
+                    onClearAll={() => updatePreferredBenchPlayerIds([])}
+                  />
                 </div>
               )}
             </div>

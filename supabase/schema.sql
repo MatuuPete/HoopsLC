@@ -261,3 +261,8 @@ alter table lineups add column bench jsonb not null default '[]';
 alter table settings add column bench_enabled boolean not null default false;
 alter table settings add column bench_size integer not null default 6
   check (bench_size between 1 and 6);
+
+-- Preferred bench players: forced onto the bench (when the bench is on),
+-- as required_player_ids is for the starting five. The app keeps the two
+-- lists disjoint and drops ids that no longer match an owned player.
+alter table settings add column preferred_bench_player_ids uuid[] not null default '{}';

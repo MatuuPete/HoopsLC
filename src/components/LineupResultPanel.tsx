@@ -259,6 +259,16 @@ export function LineupResultPanel({ result, players, cap, onSave }: LineupResult
     )
   }
 
+  if (!result.success && result.reason === 'bench_preferred_overflow') {
+    return (
+      <Notice title="Too many preferred bench players">
+        You picked {result.preferredCount} preferred bench players, but the bench has{' '}
+        {result.benchSize} spot{result.benchSize === 1 ? '' : 's'}. Uncheck some, or make the bench
+        bigger.
+      </Notice>
+    )
+  }
+
   if (!result.success && result.reason === 'bench_too_small') {
     const { requestedBenchSize, maxBenchSize } = result
     return (

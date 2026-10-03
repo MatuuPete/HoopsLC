@@ -12,13 +12,14 @@ interface Settings {
   savedLineupCount: number
   benchEnabled: boolean
   benchSize: number
+  preferredBenchPlayerIds: string[]
 }
 
 export async function getSettings(): Promise<Settings> {
   const { data, error } = await supabase
     .from('settings')
     .select(
-      'salary_cap, required_player_ids, unavailable_player_ids, objective_mode, offense_weight, saved_lineup_count, bench_enabled, bench_size',
+      'salary_cap, required_player_ids, unavailable_player_ids, objective_mode, offense_weight, saved_lineup_count, bench_enabled, bench_size, preferred_bench_player_ids',
     )
     .maybeSingle()
   if (error) throw error
@@ -31,6 +32,7 @@ export async function getSettings(): Promise<Settings> {
     savedLineupCount: data?.saved_lineup_count ?? 0,
     benchEnabled: data?.bench_enabled ?? false,
     benchSize: data?.bench_size ?? MAX_BENCH_SIZE,
+    preferredBenchPlayerIds: data?.preferred_bench_player_ids ?? [],
   }
 }
 
@@ -80,5 +82,15 @@ export async function setBenchEnabled(userId: string, benchEnabled: boolean): Pr
 
 export async function setBenchSize(userId: string, benchSize: number): Promise<void> {
   const { error } = await supabase.from('settings').upsert({ user_id: userId, bench_size: benchSize })
+  if (error) throw error
+}
+
+export async function setPreferredBenchPlayerIds(
+  userId: string,
+  preferredBenchPlayerIds: string[],
+): Promise<void> {
+  const { error } = await supabase
+    .from('settings')
+    .upsert({ user_id: userId, preferred_bench_player_ids: preferredBenchPlayerIds })
   if (error) throw error
 }

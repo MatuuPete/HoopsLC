@@ -5,6 +5,7 @@ import {
   setBenchSize,
   setObjectiveMode,
   setOffenseWeight,
+  setPreferredBenchPlayerIds,
   setRequiredPlayerIds,
   setSalaryCap,
   setSavedLineupCount,
@@ -23,6 +24,7 @@ export function useSettings() {
   const [savedLineupCount, setSavedLineupCountState] = useState(0)
   const [benchEnabled, setBenchEnabledState] = useState(false)
   const [benchSize, setBenchSizeState] = useState(MAX_BENCH_SIZE)
+  const [preferredBenchPlayerIds, setPreferredBenchPlayerIdsState] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
 
   const refresh = useCallback(async () => {
@@ -36,6 +38,7 @@ export function useSettings() {
     setSavedLineupCountState(settings.savedLineupCount)
     setBenchEnabledState(settings.benchEnabled)
     setBenchSizeState(settings.benchSize)
+    setPreferredBenchPlayerIdsState(settings.preferredBenchPlayerIds)
     setLoading(false)
   }, [])
 
@@ -91,6 +94,12 @@ export function useSettings() {
     setBenchSizeState(value)
   }
 
+  async function updatePreferredBenchPlayerIds(value: string[]) {
+    if (!session) return
+    await setPreferredBenchPlayerIds(session.user.id, value)
+    setPreferredBenchPlayerIdsState(value)
+  }
+
   return {
     salaryCap,
     requiredPlayerIds,
@@ -100,6 +109,7 @@ export function useSettings() {
     savedLineupCount,
     benchEnabled,
     benchSize,
+    preferredBenchPlayerIds,
     loading,
     updateSalaryCap,
     updateRequiredPlayerIds,
@@ -109,5 +119,6 @@ export function useSettings() {
     updateSavedLineupCount,
     updateBenchEnabled,
     updateBenchSize,
+    updatePreferredBenchPlayerIds,
   }
 }

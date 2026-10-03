@@ -90,6 +90,11 @@ export interface LineupPreferences {
    * that still fits under the same cap.
    */
   benchSize?: number
+  /**
+   * Regular players forced onto the bench, like requiredPlayerIds is for the
+   * starting five. Ignored when there is no bench; X Players are skipped.
+   */
+  preferredBenchPlayerIds?: string[]
 }
 
 export interface LineupSuccess {
@@ -140,6 +145,14 @@ export interface LineupBenchTooSmall {
   maxBenchSize: number
 }
 
+/** More players are preferred for the bench than it has spots. */
+export interface LineupBenchPreferredOverflow {
+  success: false
+  reason: 'bench_preferred_overflow'
+  preferredCount: number
+  benchSize: number
+}
+
 export type LineupResult =
   | LineupSuccess
   | LineupMissingPosition
@@ -147,3 +160,4 @@ export type LineupResult =
   | LineupNoValidXSlot
   | LineupRequiredPlayersConflict
   | LineupBenchTooSmall
+  | LineupBenchPreferredOverflow

@@ -93,6 +93,8 @@ const STEPS: Step[] = [
             <Ui>Bench</Ui>: turn it on to add 1 to 6 bench players after the starting five. Your best
             five still comes first, with enough cap held back for the full bench, which then gets the
             strongest players left. Bench players can play any position, but X Players only start.
+            Tick <Ui>Preferred bench players</Ui> to keep specific players on the bench whenever they
+            fit. A player can be preferred for the starting five or the bench, not both.
           </li>
           <li>
             <Ui>Preferred players</Ui>: tick anyone you want in the lineup. They're kept in whenever

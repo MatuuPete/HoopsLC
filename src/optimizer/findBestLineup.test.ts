@@ -815,3 +815,138 @@ describe('findBestLineup with a bench, against brute force', () => {
     }
   })
 })
+
+describe('findBestLineup with preferred bench players', () => {
+  function startingFive(): Player[] {
+    return [
+      makePlayer({ id: 'pg', positions: ['PG'] }),
+      makePlayer({ id: 'sg-x', positions: ['SG'], isXPlayer: true }),
+      makePlayer({ id: 'sf', positions: ['SF'] }),
+      makePlayer({ id: 'pf', positions: ['PF'] }),
+      makePlayer({ id: 'c', positions: ['C'] }),
+    ]
+  }
+
+  it('puts a preferred bench player on the bench even when they would otherwise start', () => {
+    const players = [
+      ...startingFive(),
+      makePlayer({ id: 'pg-star', positions: ['PG'], currentSalary: 300 }),
+      makePlayer({ id: 'e-1', positions: ['C'], currentSalary: 50 }),
+      makePlayer({ id: 'e-2', positions: ['C'], currentSalary: 10 }),
+    ]
+
+    const result = findBestLineup(players, 10000, {
+      ...DEFAULT_PREFERENCES,
+      benchSize: 2,
+      preferredBenchPlayerIds: ['pg-star'],
+    })
+
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.slots.find((s) => s.position === 'PG')?.player.id).toBe('pg')
+    expect(result.bench.map((p) => p.id).sort()).toEqual(['e-1', 'pg-star'])
+  })
+
+  it('keeps a weak preferred bench player over a stronger one', () => {
+    const players = [
+      ...startingFive(),
+      makePlayer({ id: 'e-strong', positions: ['C'], currentSalary: 90 }),
+      makePlayer({ id: 'e-weak', positions: ['C'], currentSalary: 10 }),
+    ]
+
+    const result = findBestLineup(players, 10000, {
+      ...DEFAULT_PREFERENCES,
+      benchSize: 1,
+      preferredBenchPlayerIds: ['e-weak'],
+    })
+
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.bench.map((p) => p.id)).toEqual(['e-weak'])
+  })
+
+  it('reports bench_preferred_overflow when more bench players are preferred than there are spots', () => {
+    const players = [
+      ...startingFive(),
+      makePlayer({ id: 'e-1', positions: ['C'] }),
+      makePlayer({ id: 'e-2', positions: ['C'] }),
+    ]
+
+    const result = findBestLineup(players, 10000, {
+      ...DEFAULT_PREFERENCES,
+      benchSize: 1,
+      preferredBenchPlayerIds: ['e-1', 'e-2'],
+    })
+
+    expect(result.success).toBe(false)
+    if (result.success || result.reason !== 'bench_preferred_overflow') throw new Error('expected overflow')
+    expect(result.preferredCount).toBe(2)
+    expect(result.benchSize).toBe(1)
+  })
+
+  it('reports required_players_conflict when a player is preferred for both the five and the bench', () => {
+    const players = [...startingFive(), makePlayer({ id: 'e-1', positions: ['C'] })]
+
+    const result = findBestLineup(players, 10000, {
+      ...DEFAULT_PREFERENCES,
+      benchSize: 1,
+      requiredPlayerIds: ['pg'],
+      preferredBenchPlayerIds: ['pg'],
+    })
+
+    expect(result.success).toBe(false)
+    if (result.success || result.reason !== 'required_players_conflict') throw new Error('expected conflict')
+    expect(result.conflictingPlayerIds).toEqual(['pg'])
+  })
+
+  it('reports required_players_conflict when two copies of one player are preferred, one to start and one for the bench', () => {
+    const players = [
+      ...startingFive().map((p) => (p.id === 'sf' ? { ...p, catalogPlayerId: 'cat-sf' } : p)),
+      makePlayer({ id: 'sf-copy', positions: ['SF'], catalogPlayerId: 'cat-sf' }),
+      makePlayer({ id: 'e-1', positions: ['C'] }),
+    ]
+
+    const result = findBestLineup(players, 10000, {
+      ...DEFAULT_PREFERENCES,
+      benchSize: 1,
+      requiredPlayerIds: ['sf'],
+      preferredBenchPlayerIds: ['sf-copy'],
+    })
+
+    expect(result.success).toBe(false)
+    if (result.success) return
+    expect(result.reason).toBe('required_players_conflict')
+  })
+
+  it('ignores preferred bench players when there is no bench', () => {
+    const players = [...startingFive(), makePlayer({ id: 'pg-star', positions: ['PG'], currentSalary: 300 })]
+
+    const result = findBestLineup(players, 10000, {
+      ...DEFAULT_PREFERENCES,
+      preferredBenchPlayerIds: ['pg-star'],
+    })
+
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.slots.find((s) => s.position === 'PG')?.player.id).toBe('pg-star')
+    expect(result.bench).toEqual([])
+  })
+
+  it('counts preferred bench salaries against the cap', () => {
+    const players = [
+      ...startingFive(),
+      makePlayer({ id: 'e-pricey', positions: ['C'], baseSalary: 600 }),
+    ]
+
+    const result = findBestLineup(players, 1000, {
+      ...DEFAULT_PREFERENCES,
+      benchSize: 1,
+      preferredBenchPlayerIds: ['e-pricey'],
+    })
+
+    expect(result.success).toBe(false)
+    if (result.success || result.reason !== 'cap_too_low') throw new Error('expected cap_too_low')
+    expect(result.cheapestPossibleBaseSalary).toBe(1100)
+    expect(result.closestBench.map((p) => p.id)).toEqual(['e-pricey'])
+  })
+})

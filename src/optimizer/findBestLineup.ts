@@ -120,12 +120,12 @@ function extend(
 
 /**
  * dp[mask][hasX][bench] = the Pareto frontier reachable using `players`,
- * where `bench` counts bench spots filled. It starts from
- * `seedMask`/`seedHasX`/`seedCell` instead of always starting empty —
- * this is how required players get folded in: their slots/cost/value are
- * baked into the seed before this DP runs, over the remaining
- * (non-required) players only. See findBestLineup for how the seed and
- * player list are built per required-player assignment.
+ * where `bench` counts bench spots filled. It starts from `seed` instead
+ * of always starting empty — this is how required starters and preferred
+ * bench players get folded in: their slots/cost/value are baked into the
+ * seed before this DP runs, over the remaining players only. See
+ * findBestLineup for how the seed and player list are built per
+ * required-player assignment.
  *
  * Each player either sits out, fills one open starting slot, or (regular
  * players only) takes a bench spot. Moves read from a snapshot taken before
@@ -138,9 +138,7 @@ function extend(
 function runAssignmentDp(
   players: Player[],
   scoring: Scoring,
-  seedMask: number,
-  seedHasX: number,
-  seedCell: Cell,
+  seed: { mask: number; hasX: number; bench: number; cell: Cell },
   maxCostCents: number,
 ): Frontier[][][] {
   const { benchSize } = scoring
@@ -148,7 +146,7 @@ function runAssignmentDp(
   for (let mask = 0; mask <= FULL_MASK; mask++) {
     dp[mask] = [0, 1].map(() => Array.from({ length: benchSize + 1 }, () => []))
   }
-  dp[seedMask][seedHasX][0] = [seedCell]
+  dp[seed.mask][seed.hasX][seed.bench] = [seed.cell]
 
   // cheapestSum[k] = the cheapest k salaries in the pool, a lower bound on
   // what k still-open spots will cost. A point that can't fill its open
@@ -246,10 +244,12 @@ function enumerateRequiredAssignments(requiredPlayers: Player[]): LineupSlot[][]
   return results
 }
 
+/** The starting point for the DP: required starters in their slots, then preferred bench players. */
 function buildSeed(
   assignment: LineupSlot[],
+  benchPlayers: Player[],
   scoring: Scoring,
-): { mask: number; hasX: number; cell: Cell } {
+): { mask: number; hasX: number; bench: number; cell: Cell } {
   let mask = 0
   let hasX = 0
   let cell: Cell = BASE_CELL
@@ -264,7 +264,16 @@ function buildSeed(
       source: cell,
     }
   }
-  return { mask, hasX, cell }
+  for (const player of benchPlayers) {
+    cell = {
+      costCents: cell.costCents + toCents(player.baseSalary),
+      value: cell.value + computeValue(player, scoring.preferences),
+      player,
+      slot: 'bench',
+      source: cell,
+    }
+  }
+  return { mask, hasX, bench: benchPlayers.length, cell }
 }
 
 /**
@@ -316,7 +325,16 @@ export function findBestLineup(
   preferences: LineupPreferences,
 ): LineupResult {
   const available = allPlayers.filter((p) => !preferences.unavailablePlayerIds.includes(p.id))
-  const deduped = dedupeCatalogCopies(available, preferences.requiredPlayerIds)
+  const preferredBenchIds = (preferences.benchSize ?? 0) > 0 ? (preferences.preferredBenchPlayerIds ?? []) : []
+
+  const preferredForBoth = available
+    .filter((p) => preferences.requiredPlayerIds.includes(p.id) && preferredBenchIds.includes(p.id))
+    .map((p) => p.id)
+  if (preferredForBoth.length > 0) {
+    return { success: false, reason: 'required_players_conflict', conflictingPlayerIds: preferredForBoth }
+  }
+
+  const deduped = dedupeCatalogCopies(available, [...preferences.requiredPlayerIds, ...preferredBenchIds])
   if (!deduped.ok) {
     return {
       success: false,
@@ -326,8 +344,20 @@ export function findBestLineup(
   }
   const players = deduped.players
 
+  const benchPlayers = players.filter((p) => preferredBenchIds.includes(p.id) && !p.isXPlayer)
+  if (benchPlayers.length > (preferences.benchSize ?? 0)) {
+    return {
+      success: false,
+      reason: 'bench_preferred_overflow',
+      preferredCount: benchPlayers.length,
+      benchSize: preferences.benchSize ?? 0,
+    }
+  }
+  // Preferred bench players can't start, so they don't count toward filling positions.
+  const starterPool = players.filter((p) => !benchPlayers.includes(p))
+
   const missingPositions = POSITIONS.filter(
-    (position) => !players.some((player) => player.positions.includes(position)),
+    (position) => !starterPool.some((player) => player.positions.includes(position)),
   )
   if (missingPositions.length > 0) {
     return { success: false, reason: 'missing_position', missingPositions }
@@ -354,11 +384,11 @@ export function findBestLineup(
 
   /** Final-state frontiers for one required-player assignment: a full five with each bench size. */
   function fullFivesFor(assignment: LineupSlot[], maxCostCents: number): Frontier[] {
-    const { mask, hasX, cell: seedCell } = buildSeed(assignment, scoring)
-    const usedIds = new Set(assignment.map((s) => s.player.id))
+    const seed = buildSeed(assignment, benchPlayers, scoring)
+    const usedIds = new Set([...assignment.map((s) => s.player.id), ...benchPlayers.map((p) => p.id)])
     const remainingPlayers = players.filter((p) => !usedIds.has(p.id))
     const sortedPlayers = [...remainingPlayers].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
-    return runAssignmentDp(sortedPlayers, scoring, mask, hasX, seedCell, maxCostCents)[FULL_MASK][1]
+    return runAssignmentDp(sortedPlayers, scoring, seed, maxCostCents)[FULL_MASK][1]
   }
 
   let bestFeasible: Cell | null = null
@@ -381,18 +411,18 @@ export function findBestLineup(
     const fullFives = fullFivesFor(seedAssignments[0], Infinity)
     const targetFrontier = fullFives[benchSize]
 
-    if (targetFrontier.length === 0 && fullFives[0].length > 0) {
-      let maxBenchSize = 0
-      while (fullFives[maxBenchSize + 1].length > 0) maxBenchSize++
+    // The largest bench a full five can be fielded with (-1: no full five at all).
+    const maxBenchSize = fullFives.map((frontier) => frontier.length > 0).lastIndexOf(true)
+    if (targetFrontier.length === 0 && maxBenchSize >= 0) {
       return { success: false, reason: 'bench_too_small', requestedBenchSize: benchSize, maxBenchSize }
     }
 
     if (targetFrontier.length === 0) {
       const positionsWithoutXPlayer = POSITIONS.filter(
-        (p) => !players.some((player) => player.isXPlayer && player.positions.includes(p)),
+        (p) => !starterPool.some((player) => player.isXPlayer && player.positions.includes(p)),
       )
       const positionsWithoutRegularPlayer = POSITIONS.filter(
-        (p) => !players.some((player) => !player.isXPlayer && player.positions.includes(p)),
+        (p) => !starterPool.some((player) => !player.isXPlayer && player.positions.includes(p)),
       )
       return {
         success: false,
