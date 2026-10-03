@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabaseClient'
 import { MAX_BENCH_SIZE, type ObjectiveMode } from '../optimizer/types'
+import type { PlayerRoleLists } from '../optimizer/playerRoles'
 
 const DEFAULT_CAP = 3000
 
@@ -41,23 +42,6 @@ export async function setSalaryCap(userId: string, salaryCap: number): Promise<v
   if (error) throw error
 }
 
-export async function setRequiredPlayerIds(userId: string, requiredPlayerIds: string[]): Promise<void> {
-  const { error } = await supabase
-    .from('settings')
-    .upsert({ user_id: userId, required_player_ids: requiredPlayerIds })
-  if (error) throw error
-}
-
-export async function setUnavailablePlayerIds(
-  userId: string,
-  unavailablePlayerIds: string[],
-): Promise<void> {
-  const { error } = await supabase
-    .from('settings')
-    .upsert({ user_id: userId, unavailable_player_ids: unavailablePlayerIds })
-  if (error) throw error
-}
-
 export async function setObjectiveMode(userId: string, objectiveMode: ObjectiveMode): Promise<void> {
   const { error } = await supabase.from('settings').upsert({ user_id: userId, objective_mode: objectiveMode })
   if (error) throw error
@@ -85,12 +69,13 @@ export async function setBenchSize(userId: string, benchSize: number): Promise<v
   if (error) throw error
 }
 
-export async function setPreferredBenchPlayerIds(
-  userId: string,
-  preferredBenchPlayerIds: string[],
-): Promise<void> {
-  const { error } = await supabase
-    .from('settings')
-    .upsert({ user_id: userId, preferred_bench_player_ids: preferredBenchPlayerIds })
+/** Saves all three player-role lists in one write, so a role change never leaves them half-updated. */
+export async function setPlayerRoles(userId: string, lists: PlayerRoleLists): Promise<void> {
+  const { error } = await supabase.from('settings').upsert({
+    user_id: userId,
+    required_player_ids: lists.requiredPlayerIds,
+    preferred_bench_player_ids: lists.preferredBenchPlayerIds,
+    unavailable_player_ids: lists.unavailablePlayerIds,
+  })
   if (error) throw error
 }

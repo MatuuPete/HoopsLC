@@ -232,7 +232,7 @@ export function LineupResultPanel({ result, players, cap, onSave }: LineupResult
     return (
       <Notice title="Some positions are empty">
         You don't own an available player for {result.missingPositions.join(', ')}. Add one on the
-        Players page, or free one up from your unavailable list or a saved lineup.
+        Players page, or free one up from the players you set to Out or a saved lineup.
       </Notice>
     )
   }
@@ -242,8 +242,8 @@ export function LineupResultPanel({ result, players, cap, onSave }: LineupResult
       .map((id) => players.find((p) => p.id === id)?.name ?? id)
       .join(', ')
     return (
-      <Notice title="Preferred players don't fit together">
-        {names} can't all be in one lineup. Uncheck one of them and calculate again.
+      <Notice title="Your picks don't fit together">
+        {names} can't all be in one lineup. Clear Start or Bench on one of them and calculate again.
       </Notice>
     )
   }
@@ -261,10 +261,9 @@ export function LineupResultPanel({ result, players, cap, onSave }: LineupResult
 
   if (!result.success && result.reason === 'bench_preferred_overflow') {
     return (
-      <Notice title="Too many preferred bench players">
-        You picked {result.preferredCount} preferred bench players, but the bench has{' '}
-        {result.benchSize} spot{result.benchSize === 1 ? '' : 's'}. Uncheck some, or make the bench
-        bigger.
+      <Notice title="Too many players set to Bench">
+        You set {result.preferredCount} players to Bench, but the bench has {result.benchSize} spot
+        {result.benchSize === 1 ? '' : 's'}. Clear some, or make the bench bigger.
       </Notice>
     )
   }
@@ -277,8 +276,8 @@ export function LineupResultPanel({ result, players, cap, onSave }: LineupResult
         {maxBenchSize === 0
           ? 'no regular players are left'
           : `only ${maxBenchSize} regular player${maxBenchSize === 1 ? ' is' : 's are'} left`}
-        . X Players can't sit on the bench. Pick a smaller bench, or free up players from your
-        unavailable list or a saved lineup.
+        . X Players can't sit on the bench. Pick a smaller bench, or free up players you set to Out
+        or used in a saved lineup.
       </Notice>
     )
   }
@@ -290,7 +289,7 @@ export function LineupResultPanel({ result, players, cap, onSave }: LineupResult
         <Notice title="No lineup fits under this cap">
           The cheapest possible lineup{benchSize > 0 && ` with a ${benchSize}-player bench`} costs{' '}
           <span className="font-mono text-text">{result.cheapestPossibleBaseSalary}</span>. Raise the cap
-          {benchSize > 0 ? ', shrink the bench' : ''} or mark fewer players as preferred.
+          {benchSize > 0 ? ', shrink the bench' : ''} or set fewer players to Start or Bench.
         </Notice>
         <LineupCard title="Closest lineup" slots={result.closestLineup} bench={result.closestBench} cap={cap} />
       </div>

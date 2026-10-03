@@ -1,17 +1,16 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   getSettings,
   setBenchEnabled,
   setBenchSize,
   setObjectiveMode,
   setOffenseWeight,
-  setPreferredBenchPlayerIds,
-  setRequiredPlayerIds,
+  setPlayerRoles,
   setSalaryCap,
   setSavedLineupCount,
-  setUnavailablePlayerIds,
 } from './settingsApi'
 import { MAX_BENCH_SIZE, type ObjectiveMode } from '../optimizer/types'
+import type { PlayerRoleLists } from '../optimizer/playerRoles'
 import { useAuth } from '../auth/AuthContext'
 
 export function useSettings() {
@@ -26,6 +25,7 @@ export function useSettings() {
   const [benchSize, setBenchSizeState] = useState(MAX_BENCH_SIZE)
   const [preferredBenchPlayerIds, setPreferredBenchPlayerIdsState] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
+  const roleSaves = useRef<Promise<void>>(Promise.resolve())
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -50,18 +50,6 @@ export function useSettings() {
     if (!session) return
     await setSalaryCap(session.user.id, value)
     setSalaryCapState(value)
-  }
-
-  async function updateRequiredPlayerIds(value: string[]) {
-    if (!session) return
-    await setRequiredPlayerIds(session.user.id, value)
-    setRequiredPlayerIdsState(value)
-  }
-
-  async function updateUnavailablePlayerIds(value: string[]) {
-    if (!session) return
-    await setUnavailablePlayerIds(session.user.id, value)
-    setUnavailablePlayerIdsState(value)
   }
 
   async function updateObjectiveMode(value: ObjectiveMode) {
@@ -94,10 +82,17 @@ export function useSettings() {
     setBenchSizeState(value)
   }
 
-  async function updatePreferredBenchPlayerIds(value: string[]) {
-    if (!session) return
-    await setPreferredBenchPlayerIds(session.user.id, value)
-    setPreferredBenchPlayerIdsState(value)
+  // Role buttons get clicked in quick succession, so the lists update on
+  // screen right away (the next click builds on them) and saves are queued
+  // so they reach the server in click order.
+  function updatePlayerRoles(lists: PlayerRoleLists): Promise<void> {
+    if (!session) return Promise.resolve()
+    setRequiredPlayerIdsState(lists.requiredPlayerIds)
+    setPreferredBenchPlayerIdsState(lists.preferredBenchPlayerIds)
+    setUnavailablePlayerIdsState(lists.unavailablePlayerIds)
+    const userId = session.user.id
+    roleSaves.current = roleSaves.current.catch(() => {}).then(() => setPlayerRoles(userId, lists))
+    return roleSaves.current
   }
 
   return {
@@ -112,13 +107,11 @@ export function useSettings() {
     preferredBenchPlayerIds,
     loading,
     updateSalaryCap,
-    updateRequiredPlayerIds,
-    updateUnavailablePlayerIds,
     updateObjectiveMode,
     updateOffenseWeight,
     updateSavedLineupCount,
     updateBenchEnabled,
     updateBenchSize,
-    updatePreferredBenchPlayerIds,
+    updatePlayerRoles,
   }
 }

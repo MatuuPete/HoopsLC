@@ -93,16 +93,13 @@ const STEPS: Step[] = [
             <Ui>Bench</Ui>: turn it on to add 1 to 6 bench players after the starting five. Your best
             five still comes first, with enough cap held back for the full bench, which then gets the
             strongest players left. Bench players can play any position, but X Players only start.
-            Tick <Ui>Preferred bench players</Ui> to keep specific players on the bench whenever they
-            fit. A player can be preferred for the starting five or the bench, not both.
           </li>
           <li>
-            <Ui>Preferred players</Ui>: tick anyone you want in the lineup. They're kept in whenever
-            they fit under the cap.
-          </li>
-          <li>
-            <Ui>Unavailable players</Ui>: tick anyone you can't use right now, such as a player a
-            friend has borrowed. They're left out of the calculation.
+            <Ui>Players</Ui>: one searchable list where each player has three buttons.{' '}
+            <Ui>Start</Ui> keeps them in the starting five, <Ui>Bench</Ui> keeps them on the bench
+            (when the bench is on), and <Ui>Out</Ui> leaves them out, such as a player a friend has
+            borrowed. Press the lit button again to clear it. Everyone without a button lit is picked
+            for you. The tabs above the list show who you've set to each.
           </li>
         </ul>
       </>
