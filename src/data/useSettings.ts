@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   getSettings,
+  setBenchEnabled,
+  setBenchSize,
   setObjectiveMode,
   setOffenseWeight,
   setRequiredPlayerIds,
@@ -8,7 +10,7 @@ import {
   setSavedLineupCount,
   setUnavailablePlayerIds,
 } from './settingsApi'
-import type { ObjectiveMode } from '../optimizer/types'
+import { MAX_BENCH_SIZE, type ObjectiveMode } from '../optimizer/types'
 import { useAuth } from '../auth/AuthContext'
 
 export function useSettings() {
@@ -19,6 +21,8 @@ export function useSettings() {
   const [objectiveMode, setObjectiveModeState] = useState<ObjectiveMode>('power')
   const [offenseWeight, setOffenseWeightState] = useState(0.5)
   const [savedLineupCount, setSavedLineupCountState] = useState(0)
+  const [benchEnabled, setBenchEnabledState] = useState(false)
+  const [benchSize, setBenchSizeState] = useState(MAX_BENCH_SIZE)
   const [loading, setLoading] = useState(true)
 
   const refresh = useCallback(async () => {
@@ -30,6 +34,8 @@ export function useSettings() {
     setObjectiveModeState(settings.objectiveMode)
     setOffenseWeightState(settings.offenseWeight)
     setSavedLineupCountState(settings.savedLineupCount)
+    setBenchEnabledState(settings.benchEnabled)
+    setBenchSizeState(settings.benchSize)
     setLoading(false)
   }, [])
 
@@ -73,6 +79,18 @@ export function useSettings() {
     setSavedLineupCountState(value)
   }
 
+  async function updateBenchEnabled(value: boolean) {
+    if (!session) return
+    await setBenchEnabled(session.user.id, value)
+    setBenchEnabledState(value)
+  }
+
+  async function updateBenchSize(value: number) {
+    if (!session) return
+    await setBenchSize(session.user.id, value)
+    setBenchSizeState(value)
+  }
+
   return {
     salaryCap,
     requiredPlayerIds,
@@ -80,6 +98,8 @@ export function useSettings() {
     objectiveMode,
     offenseWeight,
     savedLineupCount,
+    benchEnabled,
+    benchSize,
     loading,
     updateSalaryCap,
     updateRequiredPlayerIds,
@@ -87,5 +107,7 @@ export function useSettings() {
     updateObjectiveMode,
     updateOffenseWeight,
     updateSavedLineupCount,
+    updateBenchEnabled,
+    updateBenchSize,
   }
 }

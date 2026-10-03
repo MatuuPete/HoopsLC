@@ -6,7 +6,7 @@ import {
   updateLineupTitle,
   type SavedLineup,
 } from './lineupsApi'
-import type { SavedLineupSlot } from '../optimizer/types'
+import type { SavedBenchPlayer, SavedLineupSlot } from '../optimizer/types'
 import { useAuth } from '../auth/AuthContext'
 
 export function useLineups() {
@@ -31,9 +31,9 @@ export function useLineups() {
     if (session) refresh()
   }, [session, refresh])
 
-  async function saveLineup(slots: SavedLineupSlot[], title: string) {
+  async function saveLineup(slots: SavedLineupSlot[], bench: SavedBenchPlayer[], title: string) {
     if (!session) return
-    const created = await createLineup(slots, title, session.user.id)
+    const created = await createLineup(slots, bench, title, session.user.id)
     setLineups((prev) => [created, ...prev])
   }
 

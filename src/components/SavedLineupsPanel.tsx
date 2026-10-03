@@ -2,7 +2,7 @@ import { useState, type KeyboardEvent } from 'react'
 import type { SavedLineup } from '../data/lineupsApi'
 import { summarizeSavedLineup } from '../optimizer/summarizeSavedLineup'
 import { POSITIONS } from '../optimizer/types'
-import { Eyebrow, SlotRow } from './LineupParts'
+import { BenchRow, Eyebrow, SlotRow } from './LineupParts'
 
 interface SavedLineupsPanelProps {
   lineups: SavedLineup[]
@@ -42,7 +42,10 @@ function SavedLineupCard({
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(lineup.title)
-  const totals = summarizeSavedLineup(lineup.slots)
+  const [showBench, setShowBench] = useState(false)
+  const totals = summarizeSavedLineup(lineup.slots, lineup.bench)
+  const benchSalary = lineup.bench.reduce((sum, player) => sum + player.baseSalary, 0)
+  const benchId = `bench-${lineup.id}`
 
   function commit() {
     const next = draft.trim()
@@ -126,6 +129,54 @@ function SavedLineupCard({
           />
         ))}
       </ul>
+
+      {lineup.bench.length > 0 && (
+        <div className="mt-1 border-t border-white/[0.05] px-4">
+          <button
+            onClick={() => setShowBench((v) => !v)}
+            aria-expanded={showBench}
+            aria-controls={benchId}
+            className="-mx-1.5 flex w-[calc(100%+0.75rem)] items-center justify-between gap-2 rounded-md px-1.5 py-2 text-muted transition-colors hover:text-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+          >
+            <span className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.14em]">Bench</span>
+              <span className="rounded-full bg-white/[0.08] px-1.5 font-mono text-[11px] tabular-nums text-text">
+                {lineup.bench.length}
+              </span>
+            </span>
+            <span className="flex items-center gap-2">
+              <span className="font-mono text-xs tabular-nums">{benchSalary}</span>
+              <svg
+                viewBox="0 0 16 16"
+                className={`h-3 w-3 transition-transform ${showBench ? 'rotate-180' : ''}`}
+                fill="none"
+                aria-hidden
+              >
+                <path d="m4 6 4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </span>
+          </button>
+          {showBench && (
+            <ul id={benchId} className="divide-y divide-white/[0.05] pb-1">
+              {lineup.bench.map((player) => (
+                <BenchRow
+                  key={player.playerId}
+                  size="sm"
+                  player={{
+                    id: player.playerId,
+                    name: player.name,
+                    positions: player.positions,
+                    salary: player.baseSalary,
+                    offense: player.offense,
+                    defense: player.defense,
+                    award: player.award ?? null,
+                  }}
+                />
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       <div className="mt-2 grid grid-cols-4 gap-2 border-t border-border px-4 py-3">
         <Total label="Base" value={totals.totalBaseSalary} />

@@ -34,7 +34,8 @@ interface Cell {
   costCents: number
   value: number
   player: Player | null
-  slot: Position | null
+  /** The starting slot the player fills, or 'bench'. */
+  slot: Position | 'bench' | null
   source: Cell | null
 }
 
@@ -43,12 +44,25 @@ type Frontier = Cell[]
 
 const BASE_CELL: Cell = { costCents: 0, value: 0, player: null, slot: null, source: null }
 
-/** Merges new candidate points into an existing frontier, dropping anything dominated. */
+/**
+ * Merges new candidate points into an existing frontier, dropping anything
+ * dominated. Both inputs are sorted by cost (candidates are a frontier
+ * shifted by one player's cost and value), so this is a linear merge.
+ */
 function mergeFrontier(existing: Frontier, candidates: Cell[]): Frontier {
-  const all = [...existing, ...candidates].sort((a, b) => a.costCents - b.costCents || b.value - a.value)
+  if (existing.length === 0) return candidates
   const merged: Frontier = []
   let bestValue = -Infinity
-  for (const cell of all) {
+  let i = 0
+  let j = 0
+  while (i < existing.length || j < candidates.length) {
+    const a = existing[i]
+    const b = candidates[j]
+    const takeExisting =
+      b === undefined || (a !== undefined && (a.costCents < b.costCents || (a.costCents === b.costCents && a.value >= b.value)))
+    const cell = takeExisting ? a : b
+    if (takeExisting) i++
+    else j++
     if (cell.value > bestValue) {
       merged.push(cell)
       bestValue = cell.value
@@ -57,68 +71,125 @@ function mergeFrontier(existing: Frontier, candidates: Cell[]): Frontier {
   return merged
 }
 
+/**
+ * How a player's value is scored. A starter's value is multiplied by
+ * `starterScale`, which is larger than any bench's total value, so the
+ * starting five always ranks first and the bench only breaks ties between
+ * equally strong fives. With no bench the scale is 1, leaving values as-is.
+ */
+interface Scoring {
+  preferences: LineupPreferences
+  benchSize: number
+  starterScale: number
+}
+
+function makeScoring(players: Player[], preferences: LineupPreferences): Scoring {
+  const benchSize = preferences.benchSize ?? 0
+  if (benchSize === 0) return { preferences, benchSize, starterScale: 1 }
+  const maxValue = players.reduce((max, p) => Math.max(max, computeValue(p, preferences)), 0)
+  return { preferences, benchSize, starterScale: benchSize * maxValue + 1 }
+}
+
+function starterValue(player: Player, scoring: Scoring): number {
+  return computeValue(player, scoring.preferences) * scoring.starterScale
+}
+
 function popcount(mask: number): number {
   let count = 0
-  let m = mask
-  while (m) {
-    count += m & 1
-    m >>= 1
-  }
+  for (let m = mask; m; m >>= 1) count += m & 1
   return count
 }
 
+/** `frontier` with `player` added to every point, stopping at the first point over `maxCostCents`. */
+function extend(
+  frontier: Frontier,
+  player: Player,
+  slot: Position | 'bench',
+  costCents: number,
+  value: number,
+  maxCostCents: number,
+): Cell[] {
+  const cells: Cell[] = []
+  for (const point of frontier) {
+    const total = point.costCents + costCents
+    if (total > maxCostCents) break
+    cells.push({ costCents: total, value: point.value + value, player, slot, source: point })
+  }
+  return cells
+}
+
 /**
- * dp[mask][hasX] = the Pareto frontier reachable using `players`, starting
- * from `seedMask`/`seedHasX`/`seedCell` instead of always starting empty —
+ * dp[mask][hasX][bench] = the Pareto frontier reachable using `players`,
+ * where `bench` counts bench spots filled. It starts from
+ * `seedMask`/`seedHasX`/`seedCell` instead of always starting empty —
  * this is how required players get folded in: their slots/cost/value are
  * baked into the seed before this DP runs, over the remaining
  * (non-required) players only. See findBestLineup for how the seed and
  * player list are built per required-player assignment.
+ *
+ * Each player either sits out, fills one open starting slot, or (regular
+ * players only) takes a bench spot. Moves read from a snapshot taken before
+ * the player, so no player is used twice.
+ *
+ * Points that can't finish under `maxCostCents` are dropped as they appear.
+ * Pass Infinity to keep them, which is only needed to find the cheapest
+ * lineup when nothing fits.
  */
 function runAssignmentDp(
   players: Player[],
-  preferences: LineupPreferences,
+  scoring: Scoring,
   seedMask: number,
   seedHasX: number,
   seedCell: Cell,
-): Frontier[][] {
-  const masksByPopcount: number[][] = Array.from({ length: POSITIONS.length + 1 }, () => [])
+  maxCostCents: number,
+): Frontier[][][] {
+  const { benchSize } = scoring
+  const dp: Frontier[][][] = []
   for (let mask = 0; mask <= FULL_MASK; mask++) {
-    masksByPopcount[popcount(mask)].push(mask)
+    dp[mask] = [0, 1].map(() => Array.from({ length: benchSize + 1 }, () => []))
   }
+  dp[seedMask][seedHasX][0] = [seedCell]
 
-  const dp: Frontier[][] = []
-  for (let mask = 0; mask <= FULL_MASK; mask++) {
-    dp[mask] = [[], []]
+  // cheapestSum[k] = the cheapest k salaries in the pool, a lower bound on
+  // what k still-open spots will cost. A point that can't fill its open
+  // spots under the cap even at that price is dropped.
+  const costs = players.map((p) => toCents(p.baseSalary)).sort((a, b) => a - b)
+  const cheapestSum = [0]
+  for (const cost of costs) cheapestSum.push(cheapestSum[cheapestSum.length - 1] + cost)
+  function limitFor(mask: number, bench: number): number {
+    const open = POSITIONS.length - popcount(mask) + benchSize - bench
+    return maxCostCents - (cheapestSum[open] ?? Infinity)
   }
-  dp[seedMask][seedHasX] = [seedCell]
 
   for (const player of players) {
     const cost = toCents(player.baseSalary)
-    const value = computeValue(player, preferences)
+    const asStarter = starterValue(player, scoring)
+    const asBench = computeValue(player, scoring.preferences)
     const bits = player.positions.map((p) => ({ position: p, bit: slotBit(p) }))
+    const before = dp.map((byHasX) => byHasX.map((byBench) => [...byBench]))
 
-    for (let level = POSITIONS.length; level >= 1; level--) {
-      for (const destMask of masksByPopcount[level]) {
-        for (const { position, bit } of bits) {
-          if ((destMask & bit) === 0) continue
-          const sourceMask = destMask & ~bit
-          const hasXAfterOptions = player.isXPlayer ? [1] : [0, 1]
+    for (let mask = 0; mask <= FULL_MASK; mask++) {
+      for (const hasX of [0, 1]) {
+        // A second X Player can neither start nor sit on the bench.
+        if (player.isXPlayer && hasX === 1) continue
 
-          for (const hasXAfter of hasXAfterOptions) {
-            const hasXBefore = player.isXPlayer ? 0 : hasXAfter
-            const sourceFrontier = dp[sourceMask][hasXBefore]
-            if (sourceFrontier.length === 0) continue
+        for (let bench = 0; bench <= benchSize; bench++) {
+          const sourceFrontier = before[mask][hasX][bench]
+          if (sourceFrontier.length === 0) continue
 
-            const candidates: Cell[] = sourceFrontier.map((point) => ({
-              costCents: point.costCents + cost,
-              value: point.value + value,
-              player,
-              slot: position,
-              source: point,
-            }))
+          for (const { position, bit } of bits) {
+            if (mask & bit) continue
+            const destMask = mask | bit
+            const destHasX = player.isXPlayer ? 1 : hasX
+            const candidates = extend(sourceFrontier, player, position, cost, asStarter, limitFor(destMask, bench))
+            if (candidates.length === 0) continue
+            dp[destMask][destHasX][bench] = mergeFrontier(dp[destMask][destHasX][bench], candidates)
+          }
 
-            dp[destMask][hasXAfter] = mergeFrontier(dp[destMask][hasXAfter], candidates)
+          if (!player.isXPlayer && bench < benchSize) {
+            const candidates = extend(sourceFrontier, player, 'bench', cost, asBench, limitFor(mask, bench + 1))
+            if (candidates.length === 0) continue
+            dp[mask][hasX][bench + 1] = mergeFrontier(dp[mask][hasX][bench + 1], candidates)
           }
         }
       }
@@ -128,11 +199,14 @@ function runAssignmentDp(
   return dp
 }
 
-function reconstruct(cell: Cell): LineupSlot[] {
-  if (cell.source === null) return []
-  const rest = reconstruct(cell.source)
-  rest.push({ position: cell.slot as Position, player: cell.player as Player })
-  return rest
+function reconstruct(cell: Cell): { slots: LineupSlot[]; bench: Player[] } {
+  const slots: LineupSlot[] = []
+  const bench: Player[] = []
+  for (let c: Cell | null = cell; c && c.source; c = c.source) {
+    if (c.slot === 'bench') bench.unshift(c.player as Player)
+    else slots.unshift({ position: c.slot as Position, player: c.player as Player })
+  }
+  return { slots, bench }
 }
 
 /** Best (highest-value) point in the frontier at cost <= capCents, or null if none fits. */
@@ -174,7 +248,7 @@ function enumerateRequiredAssignments(requiredPlayers: Player[]): LineupSlot[][]
 
 function buildSeed(
   assignment: LineupSlot[],
-  preferences: LineupPreferences,
+  scoring: Scoring,
 ): { mask: number; hasX: number; cell: Cell } {
   let mask = 0
   let hasX = 0
@@ -184,7 +258,7 @@ function buildSeed(
     if (slot.player.isXPlayer) hasX = 1
     cell = {
       costCents: cell.costCents + toCents(slot.player.baseSalary),
-      value: cell.value + computeValue(slot.player, preferences),
+      value: cell.value + starterValue(slot.player, scoring),
       player: slot.player,
       slot: slot.position,
       source: cell,
@@ -275,20 +349,22 @@ export function findBestLineup(
 
   const seedAssignments = assignments.length > 0 ? assignments : [[] as LineupSlot[]]
   const capCents = toCents(salaryCap)
+  const scoring = makeScoring(players, preferences)
+  const { benchSize } = scoring
 
-  let bestFeasible: Cell | null = null
-  let firstFailure: LineupResult | null = null
-
-  for (const assignment of seedAssignments) {
-    const { mask, hasX, cell: seedCell } = buildSeed(assignment, preferences)
+  /** Final-state frontiers for one required-player assignment: a full five with each bench size. */
+  function fullFivesFor(assignment: LineupSlot[], maxCostCents: number): Frontier[] {
+    const { mask, hasX, cell: seedCell } = buildSeed(assignment, scoring)
     const usedIds = new Set(assignment.map((s) => s.player.id))
     const remainingPlayers = players.filter((p) => !usedIds.has(p.id))
     const sortedPlayers = [...remainingPlayers].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    return runAssignmentDp(sortedPlayers, scoring, mask, hasX, seedCell, maxCostCents)[FULL_MASK][1]
+  }
 
-    const dp = runAssignmentDp(sortedPlayers, preferences, mask, hasX, seedCell)
-    const targetFrontier = dp[FULL_MASK][1]
-    const feasibleCell = bestUnderCap(targetFrontier, capCents)
+  let bestFeasible: Cell | null = null
 
+  for (const assignment of seedAssignments) {
+    const feasibleCell = bestUnderCap(fullFivesFor(assignment, capCents)[benchSize], capCents)
     if (
       feasibleCell &&
       (!bestFeasible ||
@@ -297,45 +373,54 @@ export function findBestLineup(
     ) {
       bestFeasible = feasibleCell
     }
+  }
 
-    if (!feasibleCell && !firstFailure) {
-      if (targetFrontier.length === 0) {
-        const positionsWithoutXPlayer = POSITIONS.filter(
-          (p) => !players.some((player) => player.isXPlayer && player.positions.includes(p)),
-        )
-        const positionsWithoutRegularPlayer = POSITIONS.filter(
-          (p) => !players.some((player) => !player.isXPlayer && player.positions.includes(p)),
-        )
-        firstFailure = {
-          success: false,
-          reason: 'no_valid_x_slot',
-          positionsWithoutXPlayer,
-          positionsWithoutRegularPlayer,
-        }
-      } else {
-        const cheapest = targetFrontier[0]
-        const closestLineup = reconstruct(cheapest)
-        firstFailure = {
-          success: false,
-          reason: 'cap_too_low',
-          cheapestPossibleBaseSalary: cheapest.costCents / CENTS,
-          closestLineup,
-          closestTotalCurrentSalary: totalCurrentSalary(closestLineup),
-        }
+  if (!bestFeasible) {
+    // Nothing fits, so explain why using the first assignment, this time
+    // keeping over-cap points so the cheapest lineup can be shown.
+    const fullFives = fullFivesFor(seedAssignments[0], Infinity)
+    const targetFrontier = fullFives[benchSize]
+
+    if (targetFrontier.length === 0 && fullFives[0].length > 0) {
+      let maxBenchSize = 0
+      while (fullFives[maxBenchSize + 1].length > 0) maxBenchSize++
+      return { success: false, reason: 'bench_too_small', requestedBenchSize: benchSize, maxBenchSize }
+    }
+
+    if (targetFrontier.length === 0) {
+      const positionsWithoutXPlayer = POSITIONS.filter(
+        (p) => !players.some((player) => player.isXPlayer && player.positions.includes(p)),
+      )
+      const positionsWithoutRegularPlayer = POSITIONS.filter(
+        (p) => !players.some((player) => !player.isXPlayer && player.positions.includes(p)),
+      )
+      return {
+        success: false,
+        reason: 'no_valid_x_slot',
+        positionsWithoutXPlayer,
+        positionsWithoutRegularPlayer,
       }
     }
-  }
 
-  if (bestFeasible) {
-    const slots = reconstruct(bestFeasible)
+    const cheapest = targetFrontier[0]
+    const closest = reconstruct(cheapest)
     return {
-      success: true,
-      slots,
-      totalBaseSalary: bestFeasible.costCents / CENTS,
-      totalCurrentSalary: totalCurrentSalary(slots),
-      remainingCap: salaryCap - bestFeasible.costCents / CENTS,
+      success: false,
+      reason: 'cap_too_low',
+      cheapestPossibleBaseSalary: cheapest.costCents / CENTS,
+      closestLineup: closest.slots,
+      closestBench: closest.bench,
+      closestTotalCurrentSalary: totalCurrentSalary(closest.slots),
     }
   }
 
-  return firstFailure as LineupResult
+  const { slots, bench } = reconstruct(bestFeasible)
+  return {
+    success: true,
+    slots,
+    bench,
+    totalBaseSalary: bestFeasible.costCents / CENTS,
+    totalCurrentSalary: totalCurrentSalary(slots),
+    remainingCap: salaryCap - bestFeasible.costCents / CENTS,
+  }
 }

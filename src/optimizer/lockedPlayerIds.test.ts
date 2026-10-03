@@ -53,6 +53,20 @@ describe('lockedPlayerIds', () => {
     expect([...locked]).toEqual(['a'])
   })
 
+  it('locks bench players too', () => {
+    const benchPlayer = {
+      playerId: 'bench-1',
+      name: 'Bench',
+      positions: ['SF' as const],
+      currentSalary: 0,
+      baseSalary: 0,
+      offense: 0,
+      defense: 0,
+    }
+    const locked = lockedPlayerIds([{ slots: [slot({ playerId: 'a' })], bench: [benchPlayer] }])
+    expect([...locked].sort()).toEqual(['a', 'bench-1'])
+  })
+
   it('is empty for no saved lineups', () => {
     expect(lockedPlayerIds([]).size).toBe(0)
   })

@@ -90,6 +90,11 @@ const STEPS: Step[] = [
             <Ui>Stats</Ui> does the same but lets you weight offense against defense with the slider.
           </li>
           <li>
+            <Ui>Bench</Ui>: turn it on to add 1 to 6 bench players after the starting five. Your best
+            five still comes first, with enough cap held back for the full bench, which then gets the
+            strongest players left. Bench players can play any position, but X Players only start.
+          </li>
+          <li>
             <Ui>Preferred players</Ui>: tick anyone you want in the lineup. They're kept in whenever
             they fit under the cap.
           </li>
@@ -116,6 +121,10 @@ const STEPS: Step[] = [
             orange piece is your X Player.
           </li>
           <li>Each player's base salary, offense and defense.</li>
+          <li>
+            With the bench on, a <Ui>Bench</Ui> section under the starting five. Bench players are
+            locked out of your next lineup when you save, just like starters.
+          </li>
           <li>Total offense, total defense and the two TPower totals.</li>
         </ul>
         <p>
@@ -151,7 +160,7 @@ const STEPS: Step[] = [
 const RULES = [
   'Every lineup has five players, one each at PG, SG, SF, PF and C.',
   'Every lineup has exactly one X Player. Either type counts.',
-  'The five base salaries must add up to no more than your salary cap.',
+  'The five base salaries, plus the bench if you have one, must add up to no more than your salary cap.',
   'A player who can play several positions can fill any one of them, but only one slot per lineup.',
 ]
 

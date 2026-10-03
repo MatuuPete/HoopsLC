@@ -251,3 +251,13 @@ alter table players add constraint x_player_stats check (
   or (x_tier = 'standard' and offense + defense = 450)
   or (x_tier = 'legend' and offense + defense = 500)
 );
+
+-- Bench: a lineup can add 1-6 bench players after the starting five,
+-- sharing the same salary cap. Bench players are any position, never
+-- X Players. A saved lineup stores them denormalised like `slots`
+-- (playerId, name, positions, currentSalary, baseSalary, offense,
+-- defense, award?) and they are locked out of future lineups too.
+alter table lineups add column bench jsonb not null default '[]';
+alter table settings add column bench_enabled boolean not null default false;
+alter table settings add column bench_size integer not null default 6
+  check (bench_size between 1 and 6);

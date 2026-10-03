@@ -575,3 +575,243 @@ describe('findBestLineup', () => {
     expect(result.slots.find((s) => s.position === 'SG')?.player.id).toBe('sg-balanced')
   })
 })
+
+describe('findBestLineup with a bench', () => {
+  /** A valid starting five: one regular per position plus an X Player at SG, 100 salary and 100 power each. */
+  function startingFive(): Player[] {
+    return [
+      makePlayer({ id: 'pg', positions: ['PG'] }),
+      makePlayer({ id: 'sg-x', positions: ['SG'], isXPlayer: true }),
+      makePlayer({ id: 'sf', positions: ['SF'] }),
+      makePlayer({ id: 'pf', positions: ['PF'] }),
+      makePlayer({ id: 'c', positions: ['C'] }),
+    ]
+  }
+
+  function benchIds(result: ReturnType<typeof findBestLineup>): string[] {
+    if (!result.success) throw new Error(`expected success, got ${result.reason}`)
+    return result.bench.map((p) => p.id).sort()
+  }
+
+  it('returns an empty bench when no bench is asked for', () => {
+    const players = [...startingFive(), makePlayer({ id: 'extra', positions: ['PG'], currentSalary: 10 })]
+    expect(benchIds(findBestLineup(players, 10000, DEFAULT_PREFERENCES))).toEqual([])
+    expect(benchIds(findBestLineup(players, 10000, { ...DEFAULT_PREFERENCES, benchSize: 0 }))).toEqual([])
+  })
+
+  it('fills the bench with the strongest remaining players at any position, counting their salary', () => {
+    const players = [
+      ...startingFive(),
+      makePlayer({ id: 'e-pg', positions: ['PG'], currentSalary: 90 }),
+      makePlayer({ id: 'e-c', positions: ['C'], currentSalary: 80 }),
+      makePlayer({ id: 'e-weak', positions: ['SF'], currentSalary: 30 }),
+    ]
+
+    const result = findBestLineup(players, 10000, { ...DEFAULT_PREFERENCES, benchSize: 2 })
+
+    expect(benchIds(result)).toEqual(['e-c', 'e-pg'])
+    if (!result.success) return
+    expect(result.slots.map((s) => s.player.id).sort()).toEqual(['c', 'pf', 'pg', 'sf', 'sg-x'])
+    expect(result.totalBaseSalary).toBe(700)
+    expect(result.remainingCap).toBe(9300)
+  })
+
+  it('never puts an X Player on the bench', () => {
+    const players = [
+      ...startingFive(),
+      makePlayer({ id: 'pf-x', positions: ['PF'], isXPlayer: true, currentSalary: 1000 }),
+      makePlayer({ id: 'e-weak', positions: ['SF'], currentSalary: 10 }),
+    ]
+
+    expect(benchIds(findBestLineup(players, 10000, { ...DEFAULT_PREFERENCES, benchSize: 1 }))).toEqual([
+      'e-weak',
+    ])
+  })
+
+  it('holds back enough cap for the full bench, even if that means a weaker five', () => {
+    const players = [
+      ...startingFive().filter((p) => p.id !== 'pg'),
+      makePlayer({ id: 'pg-star', positions: ['PG'], baseSalary: 500, currentSalary: 300 }),
+      makePlayer({ id: 'pg-cheap', positions: ['PG'], baseSalary: 100, currentSalary: 150 }),
+      makePlayer({ id: 'bench-a', positions: ['SF'], currentSalary: 50 }),
+      makePlayer({ id: 'bench-b', positions: ['SF'], currentSalary: 50 }),
+    ]
+
+    const result = findBestLineup(players, 1000, { ...DEFAULT_PREFERENCES, benchSize: 2 })
+
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.slots.find((s) => s.position === 'PG')?.player.id).toBe('pg-cheap')
+    expect(benchIds(result)).toEqual(['bench-a', 'bench-b'])
+  })
+
+  it('puts the starting five first: a stronger five beats a weaker five with a better bench', () => {
+    const players = [
+      ...startingFive().filter((p) => p.id !== 'pg'),
+      makePlayer({ id: 'pg-strong', positions: ['PG'], baseSalary: 300, currentSalary: 200 }),
+      makePlayer({ id: 'pg-weak', positions: ['PG'], baseSalary: 200, currentSalary: 150 }),
+      makePlayer({ id: 'bench-cheap', positions: ['SF'], baseSalary: 100, currentSalary: 10 }),
+      makePlayer({ id: 'bench-mid', positions: ['SF'], baseSalary: 200, currentSalary: 90 }),
+    ]
+
+    // pg-strong + bench-cheap: 600 + 10. pg-weak + bench-mid: 550 + 90 is more in
+    // total, but the starting five is weaker.
+    const result = findBestLineup(players, 800, { ...DEFAULT_PREFERENCES, benchSize: 1 })
+
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.slots.find((s) => s.position === 'PG')?.player.id).toBe('pg-strong')
+    expect(benchIds(result)).toEqual(['bench-cheap'])
+  })
+
+  it('never benches a second copy of a starter', () => {
+    const players = [
+      ...startingFive().map((p) => (p.id === 'sf' ? { ...p, catalogPlayerId: 'cat-sf' } : p)),
+      makePlayer({ id: 'sf-copy', positions: ['SF'], baseSalary: 200, catalogPlayerId: 'cat-sf' }),
+      makePlayer({ id: 'e-weak', positions: ['C'], currentSalary: 10 }),
+    ]
+
+    expect(benchIds(findBestLineup(players, 10000, { ...DEFAULT_PREFERENCES, benchSize: 1 }))).toEqual([
+      'e-weak',
+    ])
+  })
+
+  it('leaves unavailable players off the bench', () => {
+    const players = [
+      ...startingFive(),
+      makePlayer({ id: 'e-strong', positions: ['PG'], currentSalary: 90 }),
+      makePlayer({ id: 'e-weak', positions: ['C'], currentSalary: 10 }),
+    ]
+
+    const result = findBestLineup(players, 10000, {
+      ...DEFAULT_PREFERENCES,
+      benchSize: 1,
+      unavailablePlayerIds: ['e-strong'],
+    })
+
+    expect(benchIds(result)).toEqual(['e-weak'])
+  })
+
+  it('reports bench_too_small with the largest bench that could be filled', () => {
+    const players = [...startingFive(), makePlayer({ id: 'e-1', positions: ['PG'] })]
+
+    const result = findBestLineup(players, 10000, { ...DEFAULT_PREFERENCES, benchSize: 3 })
+
+    expect(result.success).toBe(false)
+    if (result.success || result.reason !== 'bench_too_small') throw new Error('expected bench_too_small')
+    expect(result.requestedBenchSize).toBe(3)
+    expect(result.maxBenchSize).toBe(1)
+  })
+
+  it('reports cap_too_low counting the bench, with the closest lineup and bench', () => {
+    const players = [
+      ...startingFive(),
+      makePlayer({ id: 'e-1', positions: ['PG'] }),
+      makePlayer({ id: 'e-2', positions: ['C'] }),
+    ]
+
+    const result = findBestLineup(players, 600, { ...DEFAULT_PREFERENCES, benchSize: 2 })
+
+    expect(result.success).toBe(false)
+    if (result.success || result.reason !== 'cap_too_low') throw new Error('expected cap_too_low')
+    expect(result.cheapestPossibleBaseSalary).toBe(700)
+    expect(result.closestLineup).toHaveLength(5)
+    expect(result.closestBench).toHaveLength(2)
+    const used = [...result.closestLineup.map((s) => s.player.id), ...result.closestBench.map((p) => p.id)]
+    expect(used.sort()).toEqual(['c', 'e-1', 'e-2', 'pf', 'pg', 'sf', 'sg-x'])
+  })
+
+  it('keeps preferred players in the starting five', () => {
+    const players = [
+      ...startingFive(),
+      makePlayer({ id: 'pg-pref', positions: ['PG'], currentSalary: 10 }),
+      makePlayer({ id: 'e-1', positions: ['C'], currentSalary: 5 }),
+    ]
+
+    const result = findBestLineup(players, 10000, {
+      ...DEFAULT_PREFERENCES,
+      benchSize: 1,
+      requiredPlayerIds: ['pg-pref'],
+    })
+
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.slots.find((s) => s.position === 'PG')?.player.id).toBe('pg-pref')
+    expect(benchIds(result)).toEqual(['pg'])
+  })
+})
+
+describe('findBestLineup with a bench, against brute force', () => {
+  const positions: Player['positions'][number][] = ['PG', 'SG', 'SF', 'PF', 'C']
+
+  /** Lexicographic best (starter power, then bench power) by trying every lineup. */
+  function bruteForce(players: Player[], cap: number, benchSize: number): [number, number] | null {
+    const power = (p: Player) => p.offense + p.defense
+    let best: [number, number] | null = null
+    function pickStarters(slot: number, used: Set<string>, cost: number, value: number, xCount: number) {
+      if (slot === positions.length) {
+        if (xCount !== 1) return
+        const rest = players.filter((p) => !used.has(p.id) && !p.isXPlayer)
+        pickBench(rest, 0, benchSize, cost, value, 0)
+        return
+      }
+      for (const p of players) {
+        if (used.has(p.id) || !p.positions.includes(positions[slot])) continue
+        used.add(p.id)
+        pickStarters(slot + 1, used, cost + p.baseSalary, value + power(p), xCount + (p.isXPlayer ? 1 : 0))
+        used.delete(p.id)
+      }
+    }
+    function pickBench(rest: Player[], from: number, left: number, cost: number, starters: number, bench: number) {
+      if (left === 0) {
+        if (cost > cap) return
+        if (!best || starters > best[0] || (starters === best[0] && bench > best[1])) best = [starters, bench]
+        return
+      }
+      for (let i = from; i < rest.length; i++) {
+        pickBench(rest, i + 1, left - 1, cost + rest[i].baseSalary, starters, bench + rest[i].offense + rest[i].defense)
+      }
+    }
+    pickStarters(0, new Set(), 0, 0, 0)
+    return best
+  }
+
+  it('matches brute force on random small pools', () => {
+    let seed = 42
+    const rand = (n: number) => {
+      seed = (seed * 16807) % 2147483647
+      return seed % n
+    }
+
+    for (let trial = 0; trial < 150; trial++) {
+      const players: Player[] = Array.from({ length: 8 + rand(3) }, (_, i) => {
+        const isXPlayer = i < 2
+        return makePlayer({
+          id: `p${i}`,
+          positions: [...new Set([positions[rand(5)], positions[rand(5)]])],
+          isXPlayer,
+          baseSalary: 50 + rand(200),
+          offense: 10 + rand(90),
+          defense: 10 + rand(90),
+        })
+      })
+      const benchSize = 1 + rand(3)
+      const cap = 500 + rand(1200)
+
+      const expected = bruteForce(players, cap, benchSize)
+      const result = findBestLineup(players, cap, { ...DEFAULT_PREFERENCES, benchSize })
+
+      if (!expected) {
+        expect(result.success, `trial ${trial}`).toBe(false)
+        continue
+      }
+      expect(result.success, `trial ${trial}`).toBe(true)
+      if (!result.success) continue
+      const power = (p: Player) => p.offense + p.defense
+      expect(result.slots.reduce((s, slot) => s + power(slot.player), 0), `trial ${trial} starters`).toBe(expected[0])
+      expect(result.bench.reduce((s, p) => s + power(p), 0), `trial ${trial} bench`).toBe(expected[1])
+      expect(result.bench).toHaveLength(benchSize)
+      expect(result.totalBaseSalary).toBeLessThanOrEqual(cap)
+    }
+  })
+})

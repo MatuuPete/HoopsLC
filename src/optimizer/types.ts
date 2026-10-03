@@ -57,6 +57,26 @@ export interface SavedLineupSlot {
   award?: Award
 }
 
+/** Bench spots a lineup can have on top of the starting five. */
+export const MAX_BENCH_SIZE = 6
+
+/**
+ * A point-in-time snapshot of one bench player in a saved lineup, copied at
+ * save time like SavedLineupSlot. Bench players are never X Players and have
+ * no slot, so they keep every position they can play instead.
+ */
+export interface SavedBenchPlayer {
+  playerId: string
+  name: string
+  positions: Position[]
+  currentSalary: number
+  baseSalary: number
+  /** Offense and defense include any award bonus the player had at save time. */
+  offense: number
+  defense: number
+  award?: Award
+}
+
 export type ObjectiveMode = 'power' | 'stats'
 
 export interface LineupPreferences {
@@ -64,12 +84,22 @@ export interface LineupPreferences {
   unavailablePlayerIds: string[]
   objectiveMode: ObjectiveMode
   offenseWeight: number
+  /**
+   * Bench spots to fill after the starting five; 0 or absent means no bench.
+   * The starting five always ranks first, and the bench is the strongest
+   * that still fits under the same cap.
+   */
+  benchSize?: number
 }
 
 export interface LineupSuccess {
   success: true
   slots: LineupSlot[]
+  /** Regular players only; empty when no bench was asked for. */
+  bench: Player[]
+  /** Starters plus bench: everything that counts against the cap. */
   totalBaseSalary: number
+  /** Starting five only. */
   totalCurrentSalary: number
   remainingCap: number
 }
@@ -85,6 +115,7 @@ export interface LineupCapTooLow {
   reason: 'cap_too_low'
   cheapestPossibleBaseSalary: number
   closestLineup: LineupSlot[]
+  closestBench: Player[]
   closestTotalCurrentSalary: number
 }
 
@@ -101,9 +132,18 @@ export interface LineupRequiredPlayersConflict {
   conflictingPlayerIds: string[]
 }
 
+/** A starting five exists, but not enough regular players are left to fill the bench. */
+export interface LineupBenchTooSmall {
+  success: false
+  reason: 'bench_too_small'
+  requestedBenchSize: number
+  maxBenchSize: number
+}
+
 export type LineupResult =
   | LineupSuccess
   | LineupMissingPosition
   | LineupCapTooLow
   | LineupNoValidXSlot
   | LineupRequiredPlayersConflict
+  | LineupBenchTooSmall

@@ -1,11 +1,13 @@
 import { supabase } from '../lib/supabaseClient'
-import type { SavedLineupSlot } from '../optimizer/types'
+import type { SavedBenchPlayer, SavedLineupSlot } from '../optimizer/types'
 
 export interface SavedLineup {
   id: string
   title: string
   createdAt: string
   slots: SavedLineupSlot[]
+  /** Empty for lineups saved without a bench. */
+  bench: SavedBenchPlayer[]
 }
 
 interface LineupRow {
@@ -13,16 +15,23 @@ interface LineupRow {
   title: string
   created_at: string
   slots: SavedLineupSlot[]
+  bench: SavedBenchPlayer[] | null
 }
 
 function fromRow(row: LineupRow): SavedLineup {
-  return { id: row.id, title: row.title, createdAt: row.created_at, slots: row.slots }
+  return {
+    id: row.id,
+    title: row.title,
+    createdAt: row.created_at,
+    slots: row.slots,
+    bench: row.bench ?? [],
+  }
 }
 
 export async function listLineups(): Promise<SavedLineup[]> {
   const { data, error } = await supabase
     .from('lineups')
-    .select('id, title, created_at, slots')
+    .select('id, title, created_at, slots, bench')
     .order('created_at', { ascending: false })
   if (error) throw error
   return (data as LineupRow[]).map(fromRow)
@@ -30,13 +39,14 @@ export async function listLineups(): Promise<SavedLineup[]> {
 
 export async function createLineup(
   slots: SavedLineupSlot[],
+  bench: SavedBenchPlayer[],
   title: string,
   userId: string,
 ): Promise<SavedLineup> {
   const { data, error } = await supabase
     .from('lineups')
-    .insert({ user_id: userId, title, slots })
-    .select('id, title, created_at, slots')
+    .insert({ user_id: userId, title, slots, bench })
+    .select('id, title, created_at, slots, bench')
     .single()
   if (error) throw error
   return fromRow(data as LineupRow)

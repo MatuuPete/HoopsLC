@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabaseClient'
-import type { ObjectiveMode } from '../optimizer/types'
+import { MAX_BENCH_SIZE, type ObjectiveMode } from '../optimizer/types'
 
 const DEFAULT_CAP = 3000
 
@@ -10,13 +10,15 @@ interface Settings {
   objectiveMode: ObjectiveMode
   offenseWeight: number
   savedLineupCount: number
+  benchEnabled: boolean
+  benchSize: number
 }
 
 export async function getSettings(): Promise<Settings> {
   const { data, error } = await supabase
     .from('settings')
     .select(
-      'salary_cap, required_player_ids, unavailable_player_ids, objective_mode, offense_weight, saved_lineup_count',
+      'salary_cap, required_player_ids, unavailable_player_ids, objective_mode, offense_weight, saved_lineup_count, bench_enabled, bench_size',
     )
     .maybeSingle()
   if (error) throw error
@@ -27,6 +29,8 @@ export async function getSettings(): Promise<Settings> {
     objectiveMode: (data?.objective_mode as ObjectiveMode) ?? 'power',
     offenseWeight: data?.offense_weight ?? 0.5,
     savedLineupCount: data?.saved_lineup_count ?? 0,
+    benchEnabled: data?.bench_enabled ?? false,
+    benchSize: data?.bench_size ?? MAX_BENCH_SIZE,
   }
 }
 
@@ -66,5 +70,15 @@ export async function setSavedLineupCount(userId: string, savedLineupCount: numb
   const { error } = await supabase
     .from('settings')
     .upsert({ user_id: userId, saved_lineup_count: savedLineupCount })
+  if (error) throw error
+}
+
+export async function setBenchEnabled(userId: string, benchEnabled: boolean): Promise<void> {
+  const { error } = await supabase.from('settings').upsert({ user_id: userId, bench_enabled: benchEnabled })
+  if (error) throw error
+}
+
+export async function setBenchSize(userId: string, benchSize: number): Promise<void> {
+  const { error } = await supabase.from('settings').upsert({ user_id: userId, bench_size: benchSize })
   if (error) throw error
 }

@@ -1,7 +1,16 @@
 import { useState, type ReactNode } from 'react'
 import { awardFor, effectiveDefense, effectiveOffense } from '../optimizer/awards'
 import { POSITIONS, type LineupResult, type LineupSlot, type Player } from '../optimizer/types'
-import { CapStack, Eyebrow, SlotRow, Stat, type SlotView } from './LineupParts'
+import {
+  BenchRow,
+  CapStack,
+  Eyebrow,
+  GroupHeader,
+  SlotRow,
+  Stat,
+  type BenchView,
+  type SlotView,
+} from './LineupParts'
 
 function toSlotView(slot: LineupSlot): SlotView {
   return {
@@ -12,6 +21,18 @@ function toSlotView(slot: LineupSlot): SlotView {
     offense: effectiveOffense(slot.player),
     defense: effectiveDefense(slot.player),
     award: awardFor(slot.player.name),
+  }
+}
+
+function toBenchView(player: Player): BenchView {
+  return {
+    id: player.id,
+    name: player.name,
+    positions: player.positions,
+    salary: player.baseSalary,
+    offense: effectiveOffense(player),
+    defense: effectiveDefense(player),
+    award: awardFor(player.name),
   }
 }
 
@@ -84,33 +105,70 @@ function Notice({ title, children }: { title: string; children: ReactNode }) {
 function LineupCard({
   title,
   slots,
+  bench,
   cap,
   action,
 }: {
   title: string
   slots: LineupSlot[]
+  bench: Player[]
   cap: number
   action?: ReactNode
 }) {
   const views = slots
     .map(toSlotView)
     .sort((a, b) => POSITIONS.indexOf(a.position) - POSITIONS.indexOf(b.position))
+  const benchViews = bench
+    .map(toBenchView)
+    .sort((a, b) => b.offense + b.defense - (a.offense + a.defense))
+  const hasBench = benchViews.length > 0
   return (
     <section className="rounded-xl border border-border bg-panel">
       <header className="flex items-center justify-between gap-3 px-5 pt-5">
-        <Eyebrow>{title}</Eyebrow>
+        <span className="flex items-center gap-2">
+          <Eyebrow>{title}</Eyebrow>
+          {hasBench && (
+            <span className="rounded-sm border border-border px-1.5 py-px font-mono text-[10px] tabular-nums text-muted">
+              5 + {benchViews.length}
+            </span>
+          )}
+        </span>
         {action}
       </header>
 
       <div className="px-5 pt-4 pb-5">
-        <CapStack slots={views} cap={cap} />
+        <CapStack slots={views} bench={benchViews} cap={cap} />
       </div>
 
-      <ul className="divide-y divide-white/[0.06] border-t border-border px-5">
-        {views.map((slot) => (
-          <SlotRow key={slot.position} slot={slot} />
-        ))}
-      </ul>
+      <div className="border-t border-border px-5">
+        {hasBench && <GroupHeader label="Starting five" />}
+        <ul className="divide-y divide-white/[0.06]">
+          {views.map((slot) => (
+            <SlotRow key={slot.position} slot={slot} />
+          ))}
+        </ul>
+      </div>
+
+      {hasBench && (
+        <div className="border-t border-border bg-white/[0.015] px-5 pb-2">
+          <GroupHeader
+            label="Bench"
+            count={benchViews.length}
+            detail={
+              <>
+                OFF {benchViews.reduce((sum, b) => sum + b.offense, 0)}{' '}
+                <span className="text-border">/</span> DEF{' '}
+                {benchViews.reduce((sum, b) => sum + b.defense, 0)}
+              </>
+            }
+          />
+          <ul className="divide-y divide-white/[0.05]">
+            {benchViews.map((player) => (
+              <BenchRow key={player.id} player={player} />
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-x-4 gap-y-5 border-t border-border px-5 py-5 sm:grid-cols-4">
         <Stat label="Offense" value={sumOffense(slots)} />
@@ -119,6 +177,7 @@ function LineupCard({
         <Stat label="TPower · stats" value={sumStatPower(slots)} />
       </div>
       <p className="border-t border-border px-5 py-3 text-[11px] text-muted">
+        {hasBench && 'Totals are for the starting five; bench salaries still count against the cap. '}
         Offense and defense include award bonuses. TPower totals exclude kits. Salaries shown are
         what you own each player at.
       </p>
@@ -127,7 +186,7 @@ function LineupCard({
 }
 
 /** Placeholder shown in the result column before the first calculation. */
-export function LineupResultPlaceholder() {
+export function LineupResultPlaceholder({ benchSize }: { benchSize: number }) {
   return (
     <section className="rounded-xl border border-dashed border-border bg-panel/40">
       <header className="px-5 pt-5">
@@ -143,9 +202,24 @@ export function LineupResultPlaceholder() {
           </li>
         ))}
       </ul>
+      {benchSize > 0 && (
+        <div className="border-t border-dashed border-border px-5 pb-4">
+          <GroupHeader label="Bench" count={benchSize} />
+          <ul className="flex flex-col gap-3 pt-2">
+            {Array.from({ length: benchSize }, (_, i) => (
+              <li key={i} className="grid grid-cols-[3.25rem_minmax(0,1fr)] items-center gap-3">
+                <span className="h-1.5 w-6 rounded-sm bg-white/[0.04]" />
+                <span className="h-1.5 w-1/3 rounded-sm bg-white/[0.04]" />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <p className="border-t border-border px-5 py-4 text-sm text-muted">
         Set your cap and preferences, then press <span className="text-text">Calculate best lineup</span>.
-        The strongest five that fits will appear here.
+        {benchSize > 0
+          ? ` The strongest five that fits, plus a ${benchSize}-player bench, will appear here.`
+          : ' The strongest five that fits will appear here.'}
       </p>
     </section>
   )
@@ -185,15 +259,30 @@ export function LineupResultPanel({ result, players, cap, onSave }: LineupResult
     )
   }
 
+  if (!result.success && result.reason === 'bench_too_small') {
+    const { requestedBenchSize, maxBenchSize } = result
+    return (
+      <Notice title="Not enough players for the bench">
+        You asked for a {requestedBenchSize}-player bench, but after the starting five{' '}
+        {maxBenchSize === 0
+          ? 'no regular players are left'
+          : `only ${maxBenchSize} regular player${maxBenchSize === 1 ? ' is' : 's are'} left`}
+        . X Players can't sit on the bench. Pick a smaller bench, or free up players from your
+        unavailable list or a saved lineup.
+      </Notice>
+    )
+  }
+
   if (!result.success && result.reason === 'cap_too_low') {
+    const benchSize = result.closestBench.length
     return (
       <div className="flex flex-col gap-4">
         <Notice title="No lineup fits under this cap">
-          The cheapest possible lineup costs{' '}
+          The cheapest possible lineup{benchSize > 0 && ` with a ${benchSize}-player bench`} costs{' '}
           <span className="font-mono text-text">{result.cheapestPossibleBaseSalary}</span>. Raise the cap
-          or mark fewer players as preferred.
+          {benchSize > 0 ? ', shrink the bench' : ''} or mark fewer players as preferred.
         </Notice>
-        <LineupCard title="Closest lineup" slots={result.closestLineup} cap={cap} />
+        <LineupCard title="Closest lineup" slots={result.closestLineup} bench={result.closestBench} cap={cap} />
       </div>
     )
   }
@@ -204,6 +293,7 @@ export function LineupResultPanel({ result, players, cap, onSave }: LineupResult
     <LineupCard
       title="Best lineup"
       slots={result.slots}
+      bench={result.bench}
       cap={result.totalBaseSalary + result.remainingCap}
       action={onSave && <SaveLineupButton onSave={onSave} />}
     />

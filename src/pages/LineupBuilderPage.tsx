@@ -5,11 +5,11 @@ import { useLineups } from '../data/useLineups'
 import { findBestLineup } from '../optimizer/findBestLineup'
 import { lockedPlayerIds } from '../optimizer/lockedPlayerIds'
 import { awardFor, effectiveDefense, effectiveOffense, type Award } from '../optimizer/awards'
-import type { LineupResult } from '../optimizer/types'
+import { MAX_BENCH_SIZE, type LineupResult } from '../optimizer/types'
 import { LineupResultPanel, LineupResultPlaceholder } from '../components/LineupResultPanel'
 import { SavedLineupsPanel } from '../components/SavedLineupsPanel'
 import { PlayerChecklist } from '../components/PlayerChecklist'
-import { Eyebrow } from '../components/LineupParts'
+import { Eyebrow, Switch } from '../components/LineupParts'
 
 /** The award goes into a saved slot only when the player has one. */
 function awardField(name: string): { award?: Award } {
@@ -32,6 +32,10 @@ export function LineupBuilderPage() {
     updateOffenseWeight,
     savedLineupCount,
     updateSavedLineupCount,
+    benchEnabled,
+    updateBenchEnabled,
+    benchSize,
+    updateBenchSize,
   } = useSettings()
   const { lineups, error: lineupsError, saveLineup, renameLineup, removeLineup } = useLineups()
   const [capInput, setCapInput] = useState(salaryCap)
@@ -78,6 +82,7 @@ export function LineupBuilderPage() {
         unavailablePlayerIds: [...new Set([...lockedIds, ...unavailablePlayerIds])],
         objectiveMode,
         offenseWeight,
+        benchSize: activeBenchSize,
       }),
     )
   }
@@ -85,6 +90,16 @@ export function LineupBuilderPage() {
   async function handleSaveLineup() {
     if (!result || !result.success) return
     const nextCount = savedLineupCount + 1
+    const bench = result.bench.map((player) => ({
+      playerId: player.id,
+      name: player.name,
+      positions: player.positions,
+      currentSalary: player.currentSalary,
+      baseSalary: player.baseSalary,
+      offense: effectiveOffense(player),
+      defense: effectiveDefense(player),
+      ...awardField(player.name),
+    }))
     await saveLineup(
       result.slots.map((slot) => ({
         position: slot.position,
@@ -98,6 +113,7 @@ export function LineupBuilderPage() {
         defense: effectiveDefense(slot.player),
         ...awardField(slot.player.name),
       })),
+      bench,
       `Lineup ${nextCount}`,
     )
     await updateSavedLineupCount(nextCount)
@@ -122,6 +138,7 @@ export function LineupBuilderPage() {
     updateUnavailablePlayerIds(next)
   }
 
+  const activeBenchSize = benchEnabled ? benchSize : 0
   const requiredCount = availablePlayers.filter((p) => requiredPlayerIds.includes(p.id)).length
   const offensePct = Math.round(offenseWeight * 100)
 
@@ -133,7 +150,8 @@ export function LineupBuilderPage() {
             Lineup builder
           </h1>
           <p className="mt-3 text-sm text-muted">
-            Find the strongest five you can field under your salary cap.
+            Find the strongest five you can field under your salary cap
+            {activeBenchSize > 0 ? `, plus a ${activeBenchSize}-player bench.` : '.'}
           </p>
         </div>
         <dl className="flex gap-6 sm:gap-8">
@@ -204,11 +222,55 @@ export function LineupBuilderPage() {
             </div>
 
             <div className="flex flex-col gap-3 p-5">
+              <div className="flex items-center justify-between gap-3">
+                <span id="bench-label">
+                  <Eyebrow>Bench</Eyebrow>
+                </span>
+                <Switch
+                  checked={benchEnabled}
+                  onChange={updateBenchEnabled}
+                  aria-labelledby="bench-label"
+                />
+              </div>
+              <p className="-mt-1 text-xs leading-relaxed text-muted">
+                {benchEnabled
+                  ? 'Your best five comes first, with cap held back so the full bench fits. Bench players can play any position; X Players only start.'
+                  : 'Just the starting five. Turn on to add bench players under the same cap.'}
+              </p>
+
+              {benchEnabled && (
+                <div className="flex flex-col gap-2 pt-1">
+                  <div className="flex items-baseline justify-between gap-3 text-xs">
+                    <span id="bench-size-label" className="text-muted">
+                      Bench size
+                    </span>
+                    <span className="font-mono tabular-nums text-text">
+                      5 + {benchSize} <span className="text-muted">= {5 + benchSize} players</span>
+                    </span>
+                  </div>
+                  <div
+                    role="radiogroup"
+                    aria-labelledby="bench-size-label"
+                    className="grid grid-cols-6 gap-1 rounded-lg border border-border bg-bg p-1"
+                  >
+                    {Array.from({ length: MAX_BENCH_SIZE }, (_, i) => i + 1).map((size) => (
+                      <SegmentButton key={size} active={benchSize === size} onClick={() => updateBenchSize(size)}>
+                        <span className="font-mono tabular-nums">{size}</span>
+                      </SegmentButton>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-3 p-5">
               <div className="flex items-baseline justify-between gap-3">
                 <Eyebrow>Preferred players</Eyebrow>
                 {requiredCount > 0 && <span className="text-xs text-accent">{requiredCount} selected</span>}
               </div>
-              <p className="-mt-1 text-xs text-muted">Kept in the lineup whenever they fit.</p>
+              <p className="-mt-1 text-xs text-muted">
+                Kept in the {activeBenchSize > 0 ? 'starting five' : 'lineup'} whenever they fit.
+              </p>
               <PlayerChecklist
                 label="Preferred players"
                 players={availablePlayers}
@@ -289,7 +351,7 @@ export function LineupBuilderPage() {
               onSave={result.success ? handleSaveLineup : undefined}
             />
           ) : (
-            <LineupResultPlaceholder />
+            <LineupResultPlaceholder benchSize={activeBenchSize} />
           )}
         </div>
 

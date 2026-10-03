@@ -52,7 +52,7 @@ export interface SlotView {
 export function SlotRow({ slot, size = 'lg' }: { slot: SlotView; size?: 'lg' | 'sm' }) {
   if (size === 'sm') {
     return (
-      <li className="grid grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center gap-2 py-1.5 text-sm">
+      <li className="grid grid-cols-[3rem_minmax(0,1fr)_auto] items-center gap-2 py-1.5 text-sm">
         <span className="font-mono text-xs text-muted">{slot.position}</span>
         <span className="flex min-w-0 items-center gap-1.5">
           <span className="truncate text-text">{slot.name}</span>
@@ -84,13 +84,111 @@ export function SlotRow({ slot, size = 'lg' }: { slot: SlotView; size?: 'lg' | '
   )
 }
 
+export interface BenchView {
+  id: string
+  name: string
+  /** Every position the player can play; the bench has no slots. */
+  positions: Position[]
+  salary: number
+  offense: number
+  defense: number
+  award: Award | null
+}
+
+/** One bench player. `lg` is the result card, `sm` the saved-lineup cards. */
+export function BenchRow({ player, size = 'lg' }: { player: BenchView; size?: 'lg' | 'sm' }) {
+  const positions = player.positions.join('/')
+
+  if (size === 'sm') {
+    return (
+      <li className="grid grid-cols-[3rem_minmax(0,1fr)_auto] items-center gap-2 py-1.5 text-sm">
+        <span className="font-mono text-[10px] text-muted">
+          {positions}
+        </span>
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="truncate text-text/85">{player.name}</span>
+          {player.award && <AwardBadge award={player.award} />}
+        </span>
+        <span className="font-mono text-xs tabular-nums text-text/85">{player.salary}</span>
+      </li>
+    )
+  }
+
+  return (
+    <li className="grid grid-cols-[3.25rem_minmax(0,1fr)_auto] items-center gap-3 py-2.5">
+      <span className="font-mono text-[11px] leading-tight text-muted">{positions}</span>
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="truncate text-sm font-medium text-text/90">{player.name}</span>
+          {player.award && <AwardBadge award={player.award} />}
+        </span>
+        <span className="font-mono text-[11px] tabular-nums text-muted">
+          OFF {player.offense} <span className="text-border">/</span> DEF {player.defense}
+        </span>
+      </span>
+      <span className="font-mono text-sm tabular-nums text-text/85">{player.salary}</span>
+    </li>
+  )
+}
+
+/** Header for a group of rows inside a lineup card, such as the starting five or the bench. */
+export function GroupHeader({ label, count, detail }: { label: string; count?: number; detail?: ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-3 pt-4 pb-1">
+      <span className="flex items-center gap-2">
+        <Eyebrow>{label}</Eyebrow>
+        {count !== undefined && (
+          <span className="rounded-full bg-white/[0.08] px-1.5 font-mono text-[11px] tabular-nums text-text">
+            {count}
+          </span>
+        )}
+      </span>
+      {detail && <span className="font-mono text-[11px] tabular-nums text-muted">{detail}</span>}
+    </div>
+  )
+}
+
+/** An on/off toggle. Label it with `aria-labelledby` or `aria-label`. */
+export function Switch({
+  checked,
+  onChange,
+  ...aria
+}: {
+  checked: boolean
+  onChange: (checked: boolean) => void
+  'aria-label'?: string
+  'aria-labelledby'?: string
+}) {
+  return (
+    <button
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      {...aria}
+      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+        checked ? 'bg-accent' : 'bg-white/[0.12] hover:bg-white/[0.18]'
+      }`}
+    >
+      <span
+        aria-hidden
+        className={`inline-block h-4 w-4 rounded-full bg-text shadow-sm motion-safe:transition-transform ${
+          checked ? 'translate-x-[18px]' : 'translate-x-0.5'
+        }`}
+      />
+    </button>
+  )
+}
+
 /**
  * How the salary cap is spent: one segment per slot, sized by base salary, with
- * the X Player in orange. When the lineup costs more than the cap, the bar is
- * scaled to the lineup total and a marker shows where the cap sits.
+ * the X Player in orange and the bench as a dimmer group at the end. When the
+ * lineup costs more than the cap, the bar is scaled to the lineup total and a
+ * marker shows where the cap sits.
  */
-export function CapStack({ slots, cap }: { slots: SlotView[]; cap: number }) {
-  const total = slots.reduce((sum, s) => sum + s.salary, 0)
+export function CapStack({ slots, bench = [], cap }: { slots: SlotView[]; bench?: BenchView[]; cap: number }) {
+  const startersTotal = slots.reduce((sum, s) => sum + s.salary, 0)
+  const benchTotal = bench.reduce((sum, b) => sum + b.salary, 0)
+  const total = startersTotal + benchTotal
   const scale = Math.max(cap, total, 1)
   const over = total > cap
   const remaining = cap - total
@@ -115,6 +213,21 @@ export function CapStack({ slots, cap }: { slots: SlotView[]; cap: number }) {
               style={{ flexBasis: `${(s.salary / scale) * 100}%` }}
             />
           ))}
+          {bench.length > 0 && (
+            <div
+              className="flex h-full shrink gap-px motion-safe:transition-[flex-basis] motion-safe:duration-500"
+              style={{ flexBasis: `${(benchTotal / scale) * 100}%` }}
+            >
+              {bench.map((b) => (
+                <div
+                  key={b.id}
+                  title={`Bench · ${b.name} · ${b.salary}`}
+                  className={`h-full ${over ? 'bg-red-400/40' : 'bg-accent/35'}`}
+                  style={{ flexGrow: b.salary, flexBasis: 0 }}
+                />
+              ))}
+            </div>
+          )}
         </div>
         {over && (
           <div
@@ -135,11 +248,28 @@ export function CapStack({ slots, cap }: { slots: SlotView[]; cap: number }) {
             {s.position}
           </span>
         ))}
+        {bench.length > 0 && (
+          <span
+            className="shrink overflow-hidden whitespace-nowrap"
+            style={{ flexBasis: `${(benchTotal / scale) * 100}%` }}
+          >
+            BENCH
+          </span>
+        )}
       </div>
 
-      <p className={`text-xs ${over ? 'text-red-400' : 'text-muted'}`}>
-        {over ? `${-remaining} over the cap` : `${remaining} left under the cap`}
-      </p>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-xs">
+        <p className={over ? 'text-red-400' : 'text-muted'}>
+          {over ? `${-remaining} over the cap` : `${remaining} left under the cap`}
+        </p>
+        {bench.length > 0 && (
+          <p className="font-mono text-[11px] tabular-nums text-muted">
+            Starters <span className="text-text">{startersTotal}</span>
+            <span className="px-1.5 text-border">·</span>
+            Bench <span className="text-text">{benchTotal}</span>
+          </p>
+        )}
+      </div>
     </div>
   )
 }
