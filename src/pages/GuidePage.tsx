@@ -95,6 +95,12 @@ const STEPS: Step[] = [
             strongest players left. Bench players can play any position, but X Players only start.
           </li>
           <li>
+            <Ui>Legend X event</Ui>: turn it on while an event lets you field an extra Legend X. The
+            lineup can then have one X Player plus one more <TierBadge tier="legend" /> Legend X, and
+            the extra one is used only when it makes the lineup stronger. Turn it off when the event
+            ends.
+          </li>
+          <li>
             <Ui>Players</Ui>: one searchable list where each player has three buttons.{' '}
             <Ui>Start</Ui> keeps them in the starting five, <Ui>Bench</Ui> keeps them on the bench
             (when the bench is on), and <Ui>Out</Ui> leaves them out, such as a player a friend has
@@ -158,7 +164,7 @@ const STEPS: Step[] = [
 
 const RULES = [
   'Every lineup has five players, one each at PG, SG, SF, PF and C.',
-  'Every lineup has exactly one X Player. Either type counts.',
+  'Every lineup has exactly one X Player. Either type counts. During a Legend X event, it can add one more Legend X.',
   'The five base salaries, plus the bench if you have one, must add up to no more than your salary cap.',
   'A player who can play several positions can fill any one of them, but only one slot per lineup.',
 ]

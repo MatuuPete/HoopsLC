@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { MAX_BENCH_SIZE, type ObjectiveMode, type Player } from '../optimizer/types'
 import type { PlayerRoleLists } from '../optimizer/playerRoles'
-import { Eyebrow, Switch } from './LineupParts'
+import { Eyebrow, Switch, TierBadge } from './LineupParts'
 import { PlayerRolePicker } from './PlayerRolePicker'
 import { SalaryCapField } from './SalaryCapField'
 
@@ -16,6 +16,8 @@ export interface LineupSettingsPanelProps {
   onBenchEnabledChange: (enabled: boolean) => void
   benchSize: number
   onBenchSizeChange: (size: number) => void
+  legendEventEnabled: boolean
+  onLegendEventChange: (enabled: boolean) => void
   /** Owned players not locked into a saved lineup. */
   players: Player[]
   roles: PlayerRoleLists
@@ -26,7 +28,7 @@ export interface LineupSettingsPanelProps {
 }
 
 /**
- * The lineup builder's settings column: the rules (cap, objective, bench) up
+ * The lineup builder's settings column: the rules (cap, objective, bench, event) up
  * top, one player list for Start / Bench / Out picks, then Calculate.
  */
 export function LineupSettingsPanel({
@@ -40,6 +42,8 @@ export function LineupSettingsPanel({
   onBenchEnabledChange,
   benchSize,
   onBenchSizeChange,
+  legendEventEnabled,
+  onLegendEventChange,
   players,
   roles,
   onRolesChange,
@@ -129,6 +133,8 @@ export function LineupSettingsPanel({
             </div>
           )}
         </div>
+
+        <LegendEventCard enabled={legendEventEnabled} onChange={onLegendEventChange} />
       </div>
 
       <div className="flex flex-col gap-3 border-t border-border p-5">
@@ -150,6 +156,7 @@ export function LineupSettingsPanel({
           lists={roles}
           benchEnabled={benchEnabled}
           benchSize={benchSize}
+          extraLegendX={legendEventEnabled}
           onChange={onRolesChange}
         />
         {hiddenNames.length > 0 && (
@@ -179,6 +186,77 @@ export function LineupSettingsPanel({
         </button>
       </div>
     </section>
+  )
+}
+
+/**
+ * The Legend X event toggle. Below it, the lineup's X Player slots: the one
+ * every lineup has, and the extra Legend X slot the event unlocks.
+ */
+function LegendEventCard({ enabled, onChange }: { enabled: boolean; onChange: (enabled: boolean) => void }) {
+  return (
+    <div
+      className={`flex flex-col gap-3 rounded-lg border p-3 transition-colors ${
+        enabled ? 'border-rim/40 bg-rim/[0.05]' : 'border-border bg-bg/60'
+      }`}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <span id="legend-event-label" className="text-sm font-medium text-text">
+            Legend X event
+          </span>
+          <span className="text-xs text-muted">
+            {enabled ? 'On: one X Player plus one more Legend X' : 'Off: one X Player or Legend X per lineup'}
+          </span>
+        </div>
+        <Switch tone="rim" checked={enabled} onChange={onChange} aria-labelledby="legend-event-label" />
+      </div>
+      <ul aria-label="X Player slots" className="grid grid-cols-2 gap-1.5">
+        <XSlot label="X slot" caption="Every lineup" active>
+          <TierBadge tier="standard" />
+          <span className="text-[10px] text-muted">or</span>
+          <TierBadge tier="legend" />
+        </XSlot>
+        <XSlot label="Event slot" caption={enabled ? 'Legend X, when it helps' : 'Turn on for events'} active={enabled}>
+          {enabled ? (
+            <TierBadge tier="legend" />
+          ) : (
+            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 text-muted" fill="none" aria-label="Locked">
+              <rect x="3.5" y="7" width="9" height="6.5" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
+              <path d="M5.5 7V5.25a2.5 2.5 0 0 1 5 0V7" stroke="currentColor" strokeWidth="1.3" />
+            </svg>
+          )}
+        </XSlot>
+      </ul>
+    </div>
+  )
+}
+
+function XSlot({
+  label,
+  caption,
+  active,
+  children,
+}: {
+  label: string
+  caption: string
+  active: boolean
+  children: ReactNode
+}) {
+  return (
+    <li
+      className={`flex flex-col gap-1 rounded-md border px-2.5 py-2 transition-colors ${
+        active ? 'border-rim/35 bg-rim/[0.05]' : 'border-dashed border-border'
+      }`}
+    >
+      <span className="flex items-center justify-between gap-2">
+        <span className={`font-mono text-[10px] uppercase tracking-[0.12em] ${active ? 'text-rim' : 'text-muted'}`}>
+          {label}
+        </span>
+        <span className="flex items-center gap-1">{children}</span>
+      </span>
+      <span className="truncate text-[11px] text-muted">{caption}</span>
+    </li>
   )
 }
 

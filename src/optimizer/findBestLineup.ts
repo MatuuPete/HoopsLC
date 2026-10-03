@@ -7,6 +7,7 @@ import {
   type Position,
 } from './types'
 import { effectiveDefense, effectiveOffense } from './awards'
+import { X_NONE, X_STATES, finalXStates, nextXState, xPlayersFit } from './xRule'
 
 const CENTS = 100
 const STAT_SCALE = 1000
@@ -81,13 +82,15 @@ interface Scoring {
   preferences: LineupPreferences
   benchSize: number
   starterScale: number
+  extraLegendX: boolean
 }
 
 function makeScoring(players: Player[], preferences: LineupPreferences): Scoring {
   const benchSize = preferences.benchSize ?? 0
-  if (benchSize === 0) return { preferences, benchSize, starterScale: 1 }
+  const extraLegendX = preferences.extraLegendX ?? false
+  if (benchSize === 0) return { preferences, benchSize, starterScale: 1, extraLegendX }
   const maxValue = players.reduce((max, p) => Math.max(max, computeValue(p, preferences)), 0)
-  return { preferences, benchSize, starterScale: benchSize * maxValue + 1 }
+  return { preferences, benchSize, starterScale: benchSize * maxValue + 1, extraLegendX }
 }
 
 function starterValue(player: Player, scoring: Scoring): number {
@@ -119,7 +122,7 @@ function extend(
 }
 
 /**
- * dp[mask][hasX][bench] = the Pareto frontier reachable using `players`,
+ * dp[mask][xState][bench] = the Pareto frontier reachable using `players`,
  * where `bench` counts bench spots filled. It starts from `seed` instead
  * of always starting empty — this is how required starters and preferred
  * bench players get folded in: their slots/cost/value are baked into the
@@ -128,7 +131,8 @@ function extend(
  * required-player assignment.
  *
  * Each player either sits out, fills one open starting slot, or (regular
- * players only) takes a bench spot. Moves read from a snapshot taken before
+ * players only) takes a bench spot. xState (see xRule) tracks the X Players
+ * fielded so far, so a lineup never takes more than the limit. Moves read from a snapshot taken before
  * the player, so no player is used twice.
  *
  * Points that can't finish under `maxCostCents` are dropped as they appear.
@@ -138,15 +142,15 @@ function extend(
 function runAssignmentDp(
   players: Player[],
   scoring: Scoring,
-  seed: { mask: number; hasX: number; bench: number; cell: Cell },
+  seed: Seed,
   maxCostCents: number,
 ): Frontier[][][] {
-  const { benchSize } = scoring
+  const { benchSize, extraLegendX } = scoring
   const dp: Frontier[][][] = []
   for (let mask = 0; mask <= FULL_MASK; mask++) {
-    dp[mask] = [0, 1].map(() => Array.from({ length: benchSize + 1 }, () => []))
+    dp[mask] = X_STATES.map(() => Array.from({ length: benchSize + 1 }, () => []))
   }
-  dp[seed.mask][seed.hasX][seed.bench] = [seed.cell]
+  dp[seed.mask][seed.xState][seed.bench] = [seed.cell]
 
   // cheapestSum[k] = the cheapest k salaries in the pool, a lower bound on
   // what k still-open spots will cost. A point that can't fill its open
@@ -164,30 +168,32 @@ function runAssignmentDp(
     const asStarter = starterValue(player, scoring)
     const asBench = computeValue(player, scoring.preferences)
     const bits = player.positions.map((p) => ({ position: p, bit: slotBit(p) }))
-    const before = dp.map((byHasX) => byHasX.map((byBench) => [...byBench]))
+    const before = dp.map((byXState) => byXState.map((byBench) => [...byBench]))
 
     for (let mask = 0; mask <= FULL_MASK; mask++) {
-      for (const hasX of [0, 1]) {
-        // A second X Player can neither start nor sit on the bench.
-        if (player.isXPlayer && hasX === 1) continue
+      for (const xState of X_STATES) {
+        // null: the lineup is out of X Player room, so this player can't start.
+        const destXState = nextXState(xState, player, extraLegendX)
 
         for (let bench = 0; bench <= benchSize; bench++) {
-          const sourceFrontier = before[mask][hasX][bench]
+          const sourceFrontier = before[mask][xState][bench]
           if (sourceFrontier.length === 0) continue
 
-          for (const { position, bit } of bits) {
-            if (mask & bit) continue
-            const destMask = mask | bit
-            const destHasX = player.isXPlayer ? 1 : hasX
-            const candidates = extend(sourceFrontier, player, position, cost, asStarter, limitFor(destMask, bench))
-            if (candidates.length === 0) continue
-            dp[destMask][destHasX][bench] = mergeFrontier(dp[destMask][destHasX][bench], candidates)
+          if (destXState !== null) {
+            for (const { position, bit } of bits) {
+              if (mask & bit) continue
+              const destMask = mask | bit
+              const candidates = extend(sourceFrontier, player, position, cost, asStarter, limitFor(destMask, bench))
+              if (candidates.length === 0) continue
+              dp[destMask][destXState][bench] = mergeFrontier(dp[destMask][destXState][bench], candidates)
+            }
           }
 
+          // X Players never sit on the bench.
           if (!player.isXPlayer && bench < benchSize) {
             const candidates = extend(sourceFrontier, player, 'bench', cost, asBench, limitFor(mask, bench + 1))
             if (candidates.length === 0) continue
-            dp[mask][hasX][bench + 1] = mergeFrontier(dp[mask][hasX][bench + 1], candidates)
+            dp[mask][xState][bench + 1] = mergeFrontier(dp[mask][xState][bench + 1], candidates)
           }
         }
       }
@@ -244,18 +250,25 @@ function enumerateRequiredAssignments(requiredPlayers: Player[]): LineupSlot[][]
   return results
 }
 
-/** The starting point for the DP: required starters in their slots, then preferred bench players. */
-function buildSeed(
-  assignment: LineupSlot[],
-  benchPlayers: Player[],
-  scoring: Scoring,
-): { mask: number; hasX: number; bench: number; cell: Cell } {
+interface Seed {
+  mask: number
+  xState: number
+  bench: number
+  cell: Cell
+}
+
+/**
+ * The starting point for the DP: required starters in their slots, then
+ * preferred bench players. The required starters must already fit the X
+ * Player limit (findBestLineup checks this up front).
+ */
+function buildSeed(assignment: LineupSlot[], benchPlayers: Player[], scoring: Scoring): Seed {
   let mask = 0
-  let hasX = 0
+  let xState = X_NONE
   let cell: Cell = BASE_CELL
   for (const slot of assignment) {
     mask |= slotBit(slot.position)
-    if (slot.player.isXPlayer) hasX = 1
+    xState = nextXState(xState, slot.player, scoring.extraLegendX) as number
     cell = {
       costCents: cell.costCents + toCents(slot.player.baseSalary),
       value: cell.value + starterValue(slot.player, scoring),
@@ -273,7 +286,7 @@ function buildSeed(
       source: cell,
     }
   }
-  return { mask, hasX, bench: benchPlayers.length, cell }
+  return { mask, xState, bench: benchPlayers.length, cell }
 }
 
 /**
@@ -364,6 +377,15 @@ export function findBestLineup(
   }
 
   const requiredPlayers = players.filter((p) => preferences.requiredPlayerIds.includes(p.id))
+  const extraLegendX = preferences.extraLegendX ?? false
+  if (!xPlayersFit(requiredPlayers, extraLegendX)) {
+    return {
+      success: false,
+      reason: 'x_players_conflict',
+      conflictingPlayerIds: requiredPlayers.filter((p) => p.isXPlayer).map((p) => p.id),
+      extraLegendX,
+    }
+  }
   const assignments =
     requiredPlayers.length > 0 && requiredPlayers.length <= POSITIONS.length
       ? enumerateRequiredAssignments(requiredPlayers)
@@ -388,7 +410,11 @@ export function findBestLineup(
     const usedIds = new Set([...assignment.map((s) => s.player.id), ...benchPlayers.map((p) => p.id)])
     const remainingPlayers = players.filter((p) => !usedIds.has(p.id))
     const sortedPlayers = [...remainingPlayers].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
-    return runAssignmentDp(sortedPlayers, scoring, seed, maxCostCents)[FULL_MASK][1]
+    const byXState = runAssignmentDp(sortedPlayers, scoring, seed, maxCostCents)[FULL_MASK]
+    // Every X state a finished lineup may end in, merged into one frontier per bench size.
+    return Array.from({ length: benchSize + 1 }, (_, bench) =>
+      finalXStates(extraLegendX).reduce<Frontier>((merged, x) => mergeFrontier(merged, byXState[x][bench]), []),
+    )
   }
 
   let bestFeasible: Cell | null = null

@@ -745,12 +745,13 @@ describe('findBestLineup with a bench, against brute force', () => {
   const positions: Player['positions'][number][] = ['PG', 'SG', 'SF', 'PF', 'C']
 
   /** Lexicographic best (starter power, then bench power) by trying every lineup. */
-  function bruteForce(players: Player[], cap: number, benchSize: number): [number, number] | null {
+  function bruteForce(players: Player[], cap: number, benchSize: number, extraLegendX = false): [number, number] | null {
     const power = (p: Player) => p.offense + p.defense
     let best: [number, number] | null = null
     function pickStarters(slot: number, used: Set<string>, cost: number, value: number, xCount: number) {
       if (slot === positions.length) {
-        if (xCount !== 1) return
+        const legends = players.filter((p) => used.has(p.id) && p.xTier === 'legend').length
+        if (!(xCount === 1 || (extraLegendX && xCount === 2 && legends >= 1))) return
         const rest = players.filter((p) => !used.has(p.id) && !p.isXPlayer)
         pickBench(rest, 0, benchSize, cost, value, 0)
         return
@@ -813,6 +814,116 @@ describe('findBestLineup with a bench, against brute force', () => {
       expect(result.bench).toHaveLength(benchSize)
       expect(result.totalBaseSalary).toBeLessThanOrEqual(cap)
     }
+  })
+
+  it('matches brute force on random small pools during a Legend X event', () => {
+    let seed = 7
+    const rand = (n: number) => {
+      seed = (seed * 16807) % 2147483647
+      return seed % n
+    }
+
+    for (let trial = 0; trial < 150; trial++) {
+      const players: Player[] = Array.from({ length: 8 + rand(3) }, (_, i) => {
+        const isXPlayer = i < 3
+        return makePlayer({
+          id: `p${i}`,
+          positions: [...new Set([positions[rand(5)], positions[rand(5)]])],
+          isXPlayer,
+          xTier: isXPlayer ? (rand(2) === 0 ? 'legend' : 'standard') : null,
+          baseSalary: 50 + rand(200),
+          offense: 10 + rand(90),
+          defense: 10 + rand(90),
+        })
+      })
+      const benchSize = rand(3)
+      const cap = 500 + rand(1200)
+
+      const expected = bruteForce(players, cap, benchSize, true)
+      const result = findBestLineup(players, cap, { ...DEFAULT_PREFERENCES, benchSize, extraLegendX: true })
+
+      if (!expected) {
+        expect(result.success, `trial ${trial}`).toBe(false)
+        continue
+      }
+      expect(result.success, `trial ${trial}`).toBe(true)
+      if (!result.success) continue
+      const power = (p: Player) => p.offense + p.defense
+      expect(result.slots.reduce((s, slot) => s + power(slot.player), 0), `trial ${trial} starters`).toBe(expected[0])
+      expect(result.bench.reduce((s, p) => s + power(p), 0), `trial ${trial} bench`).toBe(expected[1])
+    }
+  })
+})
+
+describe('findBestLineup X Player limit', () => {
+  const legend = (id: string, positions: Player['positions'], power = 500) =>
+    makePlayer({ id, positions, isXPlayer: true, xTier: 'legend', offense: power / 2, defense: power / 2 })
+  const standard = (id: string, positions: Player['positions'], power = 450) =>
+    makePlayer({ id, positions, isXPlayer: true, xTier: 'standard', offense: power / 2, defense: power / 2 })
+  const regulars = () =>
+    (['PG', 'SG', 'SF', 'PF', 'C'] as const).map((pos) => makePlayer({ id: pos.toLowerCase(), positions: [pos] }))
+  const xIds = (result: ReturnType<typeof findBestLineup>) =>
+    result.success ? result.slots.filter((s) => s.player.isXPlayer).map((s) => s.player.id).sort() : []
+
+  it('reports x_players_conflict instead of fielding two X Players set to Start', () => {
+    const players = [legend('lx1', ['PG']), legend('lx2', ['SG']), ...regulars()]
+    const result = findBestLineup(players, 10_000, { ...DEFAULT_PREFERENCES, requiredPlayerIds: ['lx1', 'lx2'] })
+    expect(result).toEqual({
+      success: false,
+      reason: 'x_players_conflict',
+      conflictingPlayerIds: ['lx1', 'lx2'],
+      extraLegendX: false,
+    })
+  })
+
+  it('fields one X Player without the event, even when two Legend X would be stronger', () => {
+    const players = [legend('lx1', ['PG']), legend('lx2', ['SG']), ...regulars()]
+    expect(xIds(findBestLineup(players, 10_000, DEFAULT_PREFERENCES))).toHaveLength(1)
+  })
+
+  it('adds a Legend X next to a standard X during the event', () => {
+    const players = [standard('x', ['PG']), legend('lx', ['SG']), ...regulars()]
+    const result = findBestLineup(players, 10_000, { ...DEFAULT_PREFERENCES, extraLegendX: true })
+    expect(xIds(result)).toEqual(['lx', 'x'])
+  })
+
+  it('fields two Legend X during the event', () => {
+    const players = [legend('lx1', ['PG']), legend('lx2', ['SG']), ...regulars()]
+    const result = findBestLineup(players, 10_000, { ...DEFAULT_PREFERENCES, extraLegendX: true })
+    expect(xIds(result)).toEqual(['lx1', 'lx2'])
+  })
+
+  it('never pairs two standard X Players, even during the event', () => {
+    const players = [standard('x1', ['PG']), standard('x2', ['SG']), ...regulars()]
+    const result = findBestLineup(players, 10_000, { ...DEFAULT_PREFERENCES, extraLegendX: true })
+    expect(xIds(result)).toHaveLength(1)
+  })
+
+  it('leaves the extra spot unused during the event when a regular player is stronger', () => {
+    const players = [standard('x', ['PG']), legend('lx', ['SG'], 100), ...regulars()]
+    players.find((p) => p.id === 'sg')!.offense = 300
+    const result = findBestLineup(players, 10_000, { ...DEFAULT_PREFERENCES, extraLegendX: true })
+    expect(xIds(result)).toEqual(['x'])
+  })
+
+  it('accepts a standard X and a Legend X set to Start during the event', () => {
+    const players = [standard('x', ['PG']), legend('lx', ['SG']), ...regulars()]
+    const result = findBestLineup(players, 10_000, {
+      ...DEFAULT_PREFERENCES,
+      requiredPlayerIds: ['x', 'lx'],
+      extraLegendX: true,
+    })
+    expect(xIds(result)).toEqual(['lx', 'x'])
+  })
+
+  it('reports x_players_conflict for two standard X set to Start during the event', () => {
+    const players = [standard('x1', ['PG']), standard('x2', ['SG']), ...regulars()]
+    const result = findBestLineup(players, 10_000, {
+      ...DEFAULT_PREFERENCES,
+      requiredPlayerIds: ['x1', 'x2'],
+      extraLegendX: true,
+    })
+    expect(result.success === false && result.reason).toBe('x_players_conflict')
   })
 })
 

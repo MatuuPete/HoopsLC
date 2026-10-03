@@ -248,10 +248,25 @@ export function LineupResultPanel({ result, players, cap, onSave }: LineupResult
     )
   }
 
+  if (!result.success && result.reason === 'x_players_conflict') {
+    const names = result.conflictingPlayerIds
+      .map((id) => players.find((p) => p.id === id)?.name ?? id)
+      .join(', ')
+    return (
+      <Notice title="Too many X Players set to Start">
+        {names} are all set to Start, but{' '}
+        {result.extraLegendX
+          ? 'during a Legend X event a lineup fields one X Player plus one Legend X at most.'
+          : 'a lineup fields one X Player. Turn on the Legend X event to add a second Legend X.'}{' '}
+        Clear Start on one of them and calculate again.
+      </Notice>
+    )
+  }
+
   if (!result.success && result.reason === 'no_valid_x_slot') {
     return (
       <Notice title="No valid X Player slot">
-        Every lineup needs exactly one X Player. Positions with no X Player:{' '}
+        Every lineup needs an X Player. Positions with no X Player:{' '}
         <span className="text-text">{result.positionsWithoutXPlayer.join(', ') || 'none'}</span>.
         Positions with no regular player:{' '}
         <span className="text-text">{result.positionsWithoutRegularPlayer.join(', ') || 'none'}</span>.

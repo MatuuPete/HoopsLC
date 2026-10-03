@@ -266,3 +266,7 @@ alter table settings add column bench_size integer not null default 6
 -- as required_player_ids is for the starting five. The app keeps the two
 -- lists disjoint and drops ids that no longer match an owned player.
 alter table settings add column preferred_bench_player_ids uuid[] not null default '{}';
+
+-- Legend X event: while on, a lineup may field one more X Player on top
+-- of the usual one, as long as one of the two is a Legend X.
+alter table settings add column legend_event_enabled boolean not null default false;

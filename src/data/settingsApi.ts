@@ -14,13 +14,14 @@ interface Settings {
   benchEnabled: boolean
   benchSize: number
   preferredBenchPlayerIds: string[]
+  legendEventEnabled: boolean
 }
 
 export async function getSettings(): Promise<Settings> {
   const { data, error } = await supabase
     .from('settings')
     .select(
-      'salary_cap, required_player_ids, unavailable_player_ids, objective_mode, offense_weight, saved_lineup_count, bench_enabled, bench_size, preferred_bench_player_ids',
+      'salary_cap, required_player_ids, unavailable_player_ids, objective_mode, offense_weight, saved_lineup_count, bench_enabled, bench_size, preferred_bench_player_ids, legend_event_enabled',
     )
     .maybeSingle()
   if (error) throw error
@@ -34,6 +35,7 @@ export async function getSettings(): Promise<Settings> {
     benchEnabled: data?.bench_enabled ?? false,
     benchSize: data?.bench_size ?? MAX_BENCH_SIZE,
     preferredBenchPlayerIds: data?.preferred_bench_player_ids ?? [],
+    legendEventEnabled: data?.legend_event_enabled ?? false,
   }
 }
 
@@ -66,6 +68,13 @@ export async function setBenchEnabled(userId: string, benchEnabled: boolean): Pr
 
 export async function setBenchSize(userId: string, benchSize: number): Promise<void> {
   const { error } = await supabase.from('settings').upsert({ user_id: userId, bench_size: benchSize })
+  if (error) throw error
+}
+
+export async function setLegendEventEnabled(userId: string, legendEventEnabled: boolean): Promise<void> {
+  const { error } = await supabase
+    .from('settings')
+    .upsert({ user_id: userId, legend_event_enabled: legendEventEnabled })
   if (error) throw error
 }
 

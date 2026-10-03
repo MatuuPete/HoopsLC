@@ -148,14 +148,19 @@ export function GroupHeader({ label, count, detail }: { label: string; count?: n
   )
 }
 
-/** An on/off toggle. Label it with `aria-labelledby` or `aria-label`. */
+/**
+ * An on/off toggle. Label it with `aria-labelledby` or `aria-label`. The
+ * `rim` tone is for X Player settings, matching the X tier badges.
+ */
 export function Switch({
   checked,
   onChange,
+  tone = 'accent',
   ...aria
 }: {
   checked: boolean
   onChange: (checked: boolean) => void
+  tone?: 'accent' | 'rim'
   'aria-label'?: string
   'aria-labelledby'?: string
 }) {
@@ -166,7 +171,7 @@ export function Switch({
       onClick={() => onChange(!checked)}
       {...aria}
       className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
-        checked ? 'bg-accent' : 'bg-white/[0.12] hover:bg-white/[0.18]'
+        checked ? (tone === 'rim' ? 'bg-rim' : 'bg-accent') : 'bg-white/[0.12] hover:bg-white/[0.18]'
       }`}
     >
       <span

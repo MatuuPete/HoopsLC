@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import type { Player } from '../optimizer/types'
 import { roleOf, withRole, type PlayerRole, type PlayerRoleLists } from '../optimizer/playerRoles'
+import { xPlayersFit } from '../optimizer/xRule'
+import { SORT_OPTIONS, formatSortValue, sortPlayers, type SortKey } from '../lib/playerSort'
 import { TierBadge } from './LineupParts'
+import { PlayerSortControl, usePlayerSort } from './PlayerSortControl'
 
 type Tab = 'all' | PlayerRole
 
@@ -25,29 +28,40 @@ const EMPTY_TAB: Record<PlayerRole, string> = {
   out: 'No one is out. Press Out on a player to leave them out, like one a friend has borrowed.',
 }
 
+/** Sort keys whose value is worth showing on each row; the rest are already visible or self-evident. */
+const SHOWN_METRICS: SortKey[] = ['power', 'offense', 'defense', 'value', 'market', 'gain']
+
 function RoleToggle({
   player,
   role,
   roles,
+  startBlocked,
   onPick,
 }: {
   player: Player
   role: PlayerRole | null
   roles: PlayerRole[]
+  /** Why Start is unavailable for this player, if it is. */
+  startBlocked: string | null
   onPick: (role: PlayerRole | null) => void
 }) {
   return (
     <div role="group" aria-label={`${player.name} role`} className="flex shrink-0 rounded-md border border-border bg-bg p-0.5">
       {roles.map((option) => {
         const active = role === option
-        const blocked = option === 'bench' && player.isXPlayer
+        const blockedReason =
+          option === 'bench' && player.isXPlayer
+            ? 'X Players only start'
+            : option === 'start' && !active
+              ? startBlocked
+              : null
         return (
           <button
             key={option}
             type="button"
             aria-pressed={active}
-            disabled={blocked}
-            title={blocked ? 'X Players only start' : undefined}
+            disabled={blockedReason !== null}
+            title={blockedReason ?? undefined}
             onClick={() => onPick(active ? null : option)}
             className={`rounded-[5px] px-2 py-1 text-[11px] font-medium leading-none transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:text-border ${
               active ? ROLE_ACTIVE[option] : 'text-muted hover:bg-white/[0.06] hover:text-text'
@@ -71,16 +85,20 @@ export function PlayerRolePicker({
   lists,
   benchEnabled,
   benchSize,
+  extraLegendX,
   onChange,
 }: {
   players: Player[]
   lists: PlayerRoleLists
   benchEnabled: boolean
   benchSize: number
+  /** Legend X event on: Start allows a second X Player if one is a Legend X. */
+  extraLegendX: boolean
   onChange: (lists: PlayerRoleLists) => void
 }) {
   const [search, setSearch] = useState('')
   const [tab, setTab] = useState<Tab>('all')
+  const [sort, setSort] = usePlayerSort('lineup-players')
 
   const roles: PlayerRole[] = benchEnabled ? ['start', 'bench', 'out'] : ['start', 'out']
   // With the bench off, bench picks are kept but ignored, so they show as unset.
@@ -97,9 +115,17 @@ export function PlayerRolePicker({
   }
 
   const query = search.trim().toLowerCase()
-  const shown = players.filter(
-    (p) => (activeTab === 'all' || visibleRole(p) === activeTab) && p.name.toLowerCase().includes(query),
+  const shown = sortPlayers(
+    players.filter((p) => (activeTab === 'all' || visibleRole(p) === activeTab) && p.name.toLowerCase().includes(query)),
+    sort,
   )
+  const metric = SHOWN_METRICS.includes(sort.key) ? (sort.key as Exclude<SortKey, 'name'>) : null
+
+  // Start is blocked on any X Player that wouldn't fit beside the X Players already starting.
+  const startingX = players.filter((p) => p.isXPlayer && roleOf(lists, p.id) === 'start')
+  const startLimit = extraLegendX ? 'Start allows one X Player plus one Legend X' : 'Only one X Player can start'
+  const startBlockedFor = (p: Player) =>
+    p.isXPlayer && !startingX.includes(p) && !xPlayersFit([...startingX, p], extraLegendX) ? startLimit : null
 
   function clearTab(role: PlayerRole) {
     let next = lists
@@ -165,6 +191,10 @@ export function PlayerRolePicker({
         })}
       </div>
 
+      <div className="flex items-center border-b border-border px-3 py-2">
+        <PlayerSortControl sort={sort} onChange={setSort} className="w-full justify-between" />
+      </div>
+
       <ul className="scrollbar-slim flex max-h-80 flex-col gap-px overflow-y-auto p-1.5">
         {players.length === 0 && <li className="px-2.5 py-2 text-sm text-muted">No owned players available.</li>}
         {players.length > 0 && shown.length === 0 && (
@@ -194,9 +224,23 @@ export function PlayerRolePicker({
                       {p.baseSalary}
                     </>
                   )}
+                  {metric && (
+                    <>
+                      <span className="px-1 text-border">·</span>
+                      <span className="text-text/80">
+                        {SORT_OPTIONS[metric].short} {formatSortValue(p, metric)}
+                      </span>
+                    </>
+                  )}
                 </span>
               </span>
-              <RoleToggle player={p} role={role} roles={roles} onPick={(next) => onChange(withRole(lists, p.id, next))} />
+              <RoleToggle
+                player={p}
+                role={role}
+                roles={roles}
+                startBlocked={startBlockedFor(p)}
+                onPick={(next) => onChange(withRole(lists, p.id, next))}
+              />
             </li>
           )
         })}

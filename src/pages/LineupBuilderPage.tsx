@@ -34,6 +34,8 @@ export function LineupBuilderPage() {
     benchSize,
     updateBenchSize,
     preferredBenchPlayerIds,
+    legendEventEnabled,
+    updateLegendEventEnabled,
     updatePlayerRoles,
   } = useSettings()
   const { lineups, error: lineupsError, saveLineup, renameLineup, removeLineup } = useLineups()
@@ -74,6 +76,7 @@ export function LineupBuilderPage() {
         offenseWeight,
         benchSize: activeBenchSize,
         preferredBenchPlayerIds,
+        extraLegendX: legendEventEnabled,
       }),
     )
   }
@@ -149,6 +152,8 @@ export function LineupBuilderPage() {
             onBenchEnabledChange={updateBenchEnabled}
             benchSize={benchSize}
             onBenchSizeChange={updateBenchSize}
+            legendEventEnabled={legendEventEnabled}
+            onLegendEventChange={updateLegendEventEnabled}
             players={availablePlayers}
             roles={{ requiredPlayerIds, preferredBenchPlayerIds, unavailablePlayerIds }}
             onRolesChange={updatePlayerRoles}

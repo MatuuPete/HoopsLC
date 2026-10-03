@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { awardFor } from '../optimizer/awards'
 import type { Player, Position } from '../optimizer/types'
+import { power, sortPlayers, SORT_OPTIONS, type PlayerSort, type SortKey } from '../lib/playerSort'
 import { AwardBadge, TierBadge } from './LineupParts'
+import { PlayerSortControl, SortArrow, nextSort, usePlayerSort } from './PlayerSortControl'
 import { IconButton, PositionFilter, SearchInput, pencilPath, trashPath } from './ui'
 
 interface PlayerTableProps {
@@ -27,6 +29,44 @@ function SalaryChange({ player }: { player: Player }) {
   )
 }
 
+/**
+ * A column header that sorts the table by `sortKey`: the first click sorts
+ * in the key's natural direction, the next flips it.
+ */
+function SortHeader({
+  label,
+  sortKey,
+  sort,
+  onSort,
+  align = 'left',
+}: {
+  label: string
+  sortKey: SortKey
+  sort: PlayerSort
+  onSort: (sort: PlayerSort) => void
+  align?: 'left' | 'right'
+}) {
+  const active = sort.key === sortKey
+  return (
+    <th
+      className={`${th} ${align === 'right' ? 'text-right' : ''}`}
+      aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(nextSort(sort, sortKey))}
+        title={`Sort by ${SORT_OPTIONS[sortKey].label.toLowerCase()}`}
+        className={`inline-flex items-center gap-1 uppercase tracking-[0.14em] transition-colors hover:text-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+          align === 'right' ? 'flex-row-reverse' : ''
+        } ${active ? 'text-text' : ''}`}
+      >
+        {label}
+        <SortArrow dir={active ? sort.dir : 'desc'} className={`h-3 w-3 ${active ? 'text-accent' : 'opacity-0'}`} />
+      </button>
+    </th>
+  )
+}
+
 /** The award bonus on top of a catalog stat, e.g. "+10". */
 function AwardBonus({ bonus }: { bonus: number | undefined }) {
   if (!bonus) return null
@@ -36,35 +76,43 @@ function AwardBonus({ bonus }: { bonus: number | undefined }) {
 export function PlayerTable({ players, onEdit, onDelete, onSelect, selectedId }: PlayerTableProps) {
   const [search, setSearch] = useState('')
   const [position, setPosition] = useState<Position | 'ALL'>('ALL')
+  const [sort, setSort] = usePlayerSort('roster')
 
   const query = search.toLowerCase()
-  const visible = players.filter(
-    (p) =>
-      p.name.toLowerCase().includes(query) && (position === 'ALL' || p.positions.includes(position)),
+  const visible = sortPlayers(
+    players.filter(
+      (p) =>
+        p.name.toLowerCase().includes(query) && (position === 'ALL' || p.positions.includes(position)),
+    ),
+    sort,
   )
 
   return (
     <section className="overflow-hidden rounded-xl border border-border bg-panel">
-      <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="sm:w-64">
-          <SearchInput value={search} onChange={setSearch} placeholder="Search roster" label="Search roster" />
+      <div className="flex flex-col gap-3 border-b border-border p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="sm:w-64">
+            <SearchInput value={search} onChange={setSearch} placeholder="Search roster" label="Search roster" />
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <PositionFilter value={position} onChange={setPosition} />
+            <span className="font-mono text-xs tabular-nums text-muted sm:hidden">{visible.length}</span>
+          </div>
         </div>
-        <div className="flex items-center justify-between gap-3">
-          <PositionFilter value={position} onChange={setPosition} />
-          <span className="font-mono text-xs tabular-nums text-muted sm:hidden">{visible.length}</span>
-        </div>
+        <PlayerSortControl sort={sort} onChange={setSort} className="justify-between sm:justify-start" />
       </div>
 
       <div className="scrollbar-slim overflow-x-auto">
-        <table className="w-full min-w-[640px] border-collapse text-sm">
+        <table className="w-full min-w-[700px] border-collapse text-sm">
           <thead>
             <tr className="text-left">
-              <th className={th}>Player</th>
-              <th className={th}>Pos</th>
-              <th className={`${th} text-right`}>Base</th>
-              <th className={`${th} text-right`}>Current</th>
-              <th className={`${th} text-right`}>Off</th>
-              <th className={`${th} text-right`}>Def</th>
+              <SortHeader label="Player" sortKey="name" sort={sort} onSort={setSort} />
+              <SortHeader label="Pos" sortKey="position" sort={sort} onSort={setSort} />
+              <SortHeader label="Base" sortKey="salary" sort={sort} onSort={setSort} align="right" />
+              <SortHeader label="Current" sortKey="market" sort={sort} onSort={setSort} align="right" />
+              <SortHeader label="Off" sortKey="offense" sort={sort} onSort={setSort} align="right" />
+              <SortHeader label="Def" sortKey="defense" sort={sort} onSort={setSort} align="right" />
+              <SortHeader label="Pwr" sortKey="power" sort={sort} onSort={setSort} align="right" />
               <th className={th}>
                 <span className="sr-only">Actions</span>
               </th>
@@ -120,6 +168,7 @@ export function PlayerTable({ players, onEdit, onDelete, onSelect, selectedId }:
                     {p.defense}
                     <AwardBonus bonus={award?.defense} />
                   </td>
+                  <td className={`${numCell} font-medium text-text`}>{power(p)}</td>
                   <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                     <span className="flex justify-end gap-0.5 opacity-60 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
                       <IconButton label={`Edit ${p.name}`} onClick={() => onEdit(p)}>

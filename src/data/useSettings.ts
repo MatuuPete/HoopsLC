@@ -3,6 +3,7 @@ import {
   getSettings,
   setBenchEnabled,
   setBenchSize,
+  setLegendEventEnabled,
   setObjectiveMode,
   setOffenseWeight,
   setPlayerRoles,
@@ -24,6 +25,7 @@ export function useSettings() {
   const [benchEnabled, setBenchEnabledState] = useState(false)
   const [benchSize, setBenchSizeState] = useState(MAX_BENCH_SIZE)
   const [preferredBenchPlayerIds, setPreferredBenchPlayerIdsState] = useState<string[]>([])
+  const [legendEventEnabled, setLegendEventEnabledState] = useState(false)
   const [loading, setLoading] = useState(true)
   const roleSaves = useRef<Promise<void>>(Promise.resolve())
 
@@ -39,6 +41,7 @@ export function useSettings() {
     setBenchEnabledState(settings.benchEnabled)
     setBenchSizeState(settings.benchSize)
     setPreferredBenchPlayerIdsState(settings.preferredBenchPlayerIds)
+    setLegendEventEnabledState(settings.legendEventEnabled)
     setLoading(false)
   }, [])
 
@@ -82,6 +85,12 @@ export function useSettings() {
     setBenchSizeState(value)
   }
 
+  async function updateLegendEventEnabled(value: boolean) {
+    if (!session) return
+    await setLegendEventEnabled(session.user.id, value)
+    setLegendEventEnabledState(value)
+  }
+
   // Role buttons get clicked in quick succession, so the lists update on
   // screen right away (the next click builds on them) and saves are queued
   // so they reach the server in click order.
@@ -105,6 +114,7 @@ export function useSettings() {
     benchEnabled,
     benchSize,
     preferredBenchPlayerIds,
+    legendEventEnabled,
     loading,
     updateSalaryCap,
     updateObjectiveMode,
@@ -112,6 +122,7 @@ export function useSettings() {
     updateSavedLineupCount,
     updateBenchEnabled,
     updateBenchSize,
+    updateLegendEventEnabled,
     updatePlayerRoles,
   }
 }

@@ -95,6 +95,11 @@ export interface LineupPreferences {
    * starting five. Ignored when there is no bench; X Players are skipped.
    */
   preferredBenchPlayerIds?: string[]
+  /**
+   * A Legend X event: the lineup may field one more X Player on top of the
+   * usual one, as long as one of the two is a Legend X. Absent means off.
+   */
+  extraLegendX?: boolean
 }
 
 export interface LineupSuccess {
@@ -137,6 +142,14 @@ export interface LineupRequiredPlayersConflict {
   conflictingPlayerIds: string[]
 }
 
+/** More X Players are set to Start than the X Player limit allows. */
+export interface LineupXPlayersConflict {
+  success: false
+  reason: 'x_players_conflict'
+  conflictingPlayerIds: string[]
+  extraLegendX: boolean
+}
+
 /** A starting five exists, but not enough regular players are left to fill the bench. */
 export interface LineupBenchTooSmall {
   success: false
@@ -159,5 +172,6 @@ export type LineupResult =
   | LineupCapTooLow
   | LineupNoValidXSlot
   | LineupRequiredPlayersConflict
+  | LineupXPlayersConflict
   | LineupBenchTooSmall
   | LineupBenchPreferredOverflow
