@@ -10,6 +10,7 @@ import { AppLayout } from './components/AppLayout'
 import { PlayersPage } from './pages/PlayersPage'
 import { LineupBuilderPage } from './pages/LineupBuilderPage'
 import { AdminCatalogPage } from './pages/AdminCatalogPage'
+import { AdminClipboardPage } from './pages/AdminClipboardPage'
 import { GuidePage } from './pages/GuidePage'
 
 function App() {
@@ -36,6 +37,14 @@ function App() {
               element={
                 <AdminRoute>
                   <AdminCatalogPage />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin/clipboard"
+              element={
+                <AdminRoute>
+                  <AdminClipboardPage />
                 </AdminRoute>
               }
             />

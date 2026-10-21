@@ -8,24 +8,29 @@ const baseLinks = [
   { to: '/guide', label: 'How It Works' },
 ]
 
+const adminLinks = [
+  { to: '/admin/catalog', label: 'Catalog Admin' },
+  { to: '/admin/clipboard', label: 'Clipboard' },
+]
+
 export function NavBar() {
   const { signOut, isAdmin } = useAuth()
   const navigate = useNavigate()
-  const links = isAdmin ? [...baseLinks, { to: '/admin/catalog', label: 'Catalog Admin' }] : baseLinks
+  const links = isAdmin ? [...baseLinks, ...adminLinks] : baseLinks
 
   return (
-    <nav className="flex items-center justify-between border-b border-border px-6 py-4">
+    <nav className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-border px-4 py-4 sm:px-6">
       <Link to="/" className="flex items-center gap-2 text-sm uppercase tracking-widest font-bold">
         <Logo className="w-5 h-5 text-text" />
         Six Man
       </Link>
-      <div className="flex items-center gap-6">
+      <div className="scrollbar-slim -mx-4 flex w-full items-center gap-6 overflow-x-auto px-4 pb-1 sm:mx-0 sm:w-auto sm:overflow-visible sm:px-0 sm:pb-0">
         {links.map((link) => (
           <NavLink
             key={link.to}
             to={link.to}
             className={({ isActive }) =>
-              `flex items-center text-xs uppercase tracking-widest ${
+              `flex shrink-0 items-center whitespace-nowrap text-xs uppercase tracking-widest ${
                 isActive ? 'text-accent' : 'text-muted'
               }`
             }
@@ -39,7 +44,7 @@ export function NavBar() {
             await signOut()
             navigate('/', { replace: true })
           }}
-          className="text-xs uppercase tracking-widest text-muted">
+          className="shrink-0 whitespace-nowrap text-xs uppercase tracking-widest text-muted">
           Sign Out
         </button>
       </div>

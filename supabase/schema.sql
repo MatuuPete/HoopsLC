@@ -270,3 +270,26 @@ alter table settings add column preferred_bench_player_ids uuid[] not null defau
 -- Legend X event: while on, a lineup may field one more X Player on top
 -- of the usual one, as long as one of the two is a Legend X.
 alter table settings add column legend_event_enabled boolean not null default false;
+
+-- Clipboard: an admin's private scratch space for text pasted on one
+-- device (e.g. a phone) and picked up on another. Rows are owner-only;
+-- only admins may add them, since the page is admin-only.
+create table clips (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  body text not null check (length(body) between 1 and 100000),
+  created_at timestamptz not null default now()
+);
+
+alter table clips enable row level security;
+
+create policy "clips_owner" on clips
+  for all using (auth.uid() = user_id)
+  with check (
+    auth.uid() = user_id
+    and exists (select 1 from profiles where profiles.user_id = auth.uid() and profiles.is_admin)
+  );
+
+-- Live sync: the clipboard page listens for inserts/deletes so a clip saved
+-- on the phone appears on an already-open laptop tab without a reload.
+alter publication supabase_realtime add table clips;
