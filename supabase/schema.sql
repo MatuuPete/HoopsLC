@@ -457,3 +457,13 @@ end;
 $$;
 
 revoke execute on function apply_x_pool_import(jsonb) from anon;
+
+-- Super Big 3: three starters of any team get +20% instead of a Team Big 3.
+-- big3_mode picks which bonus the builder uses; big3_count stays the Team
+-- Big 3 count. super_big3_player_ids is a locked trio (empty: the builder
+-- picks it). Existing Team Big 3 users carry over to mode 'team' (choosing
+-- Off resets big3_count to 0, so this update is safe to re-run).
+alter table settings add column if not exists big3_mode text not null default 'off'
+  check (big3_mode in ('off', 'team', 'super'));
+update settings set big3_mode = 'team' where big3_mode = 'off' and big3_count > 0;
+alter table settings add column if not exists super_big3_player_ids uuid[] not null default '{}';

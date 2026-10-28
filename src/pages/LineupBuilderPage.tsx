@@ -6,7 +6,7 @@ import { useCatalog } from '../data/useCatalog'
 import { findBestLineup } from '../optimizer/findBestLineup'
 import { lockedPlayerIds } from '../optimizer/lockedPlayerIds'
 import { awardFor, effectiveDefense, effectiveOffense, type Award } from '../optimizer/awards'
-import { big3BonusMap, big3Stars, type Big3Tag } from '../optimizer/big3'
+import { SUPER_BIG3_SIZE, big3BonusMap, big3Stars, superBig3Bonus, type Big3Tag } from '../optimizer/big3'
 import type { LineupResult, Player } from '../optimizer/types'
 import { LineupResultPanel, LineupResultPlaceholder } from '../components/LineupResultPanel'
 import { SavedLineupsPanel } from '../components/SavedLineupsPanel'
@@ -18,13 +18,15 @@ function awardField(name: string): { award?: Award } {
   return award ? { award } : {}
 }
 
-/** A saved player's stats with every bonus baked in, plus their award and Big 3 team. */
-function savedStats(player: Player, tag: Big3Tag | undefined) {
+/** A saved player's stats with every bonus baked in, plus their award and Big 3 marks. */
+function savedStats(player: Player, tag: Big3Tag | undefined, inSuperBig3 = false) {
+  const superBonus = inSuperBig3 ? superBig3Bonus(player) : null
   return {
-    offense: effectiveOffense(player) + (tag?.offense ?? 0),
-    defense: effectiveDefense(player) + (tag?.defense ?? 0),
+    offense: effectiveOffense(player) + (tag?.offense ?? 0) + (superBonus?.offense ?? 0),
+    defense: effectiveDefense(player) + (tag?.defense ?? 0) + (superBonus?.defense ?? 0),
     ...awardField(player.name),
     ...(tag ? { big3Team: tag.team } : {}),
+    ...(inSuperBig3 ? { superBig3: true } : {}),
   }
 }
 
@@ -48,8 +50,11 @@ export function LineupBuilderPage() {
     preferredBenchPlayerIds,
     legendEventEnabled,
     updateLegendEventEnabled,
+    big3Mode,
     big3Count,
-    updateBig3Count,
+    updateBig3,
+    superBig3PlayerIds,
+    updateSuperBig3PlayerIds,
     updatePlayerRoles,
     error: settingsError,
   } = useSettings()
@@ -79,6 +84,12 @@ export function LineupBuilderPage() {
     [players, lockedIds],
   )
 
+  // A locked Super Big 3 counts only while all three are still owned; otherwise the builder picks.
+  const lockedSuperBig3 = useMemo(() => {
+    const owned = superBig3PlayerIds.filter((id) => players.some((p) => p.id === id))
+    return owned.length === SUPER_BIG3_SIZE ? owned : []
+  }, [superBig3PlayerIds, players])
+
   useEffect(() => {
     setCapInput(salaryCap)
   }, [salaryCap])
@@ -95,7 +106,8 @@ export function LineupBuilderPage() {
         benchSize: activeBenchSize,
         preferredBenchPlayerIds,
         extraLegendX: legendEventEnabled,
-        big3: { maxCount: big3Count, stars },
+        big3: big3Mode === 'team' ? { maxCount: Math.max(1, big3Count), stars } : undefined,
+        superBig3: big3Mode === 'super' ? { lockedIds: lockedSuperBig3 } : undefined,
       }),
     )
   }
@@ -104,6 +116,7 @@ export function LineupBuilderPage() {
     if (!result || !result.success) return
     const nextCount = savedLineupCount + 1
     const tags = big3BonusMap(result.big3s, [...result.slots.map((s) => s.player), ...result.bench])
+    const superIds = new Set(result.superBig3)
     const bench = result.bench.map((player) => ({
       playerId: player.id,
       name: player.name,
@@ -121,7 +134,7 @@ export function LineupBuilderPage() {
         ...(slot.player.xTier ? { xTier: slot.player.xTier } : {}),
         currentSalary: slot.player.currentSalary,
         baseSalary: slot.player.baseSalary,
-        ...savedStats(slot.player, tags.get(slot.player.id)),
+        ...savedStats(slot.player, tags.get(slot.player.id), superIds.has(slot.player.id)),
       })),
       bench,
       `Lineup ${nextCount}`,
@@ -172,10 +185,14 @@ export function LineupBuilderPage() {
             onBenchSizeChange={updateBenchSize}
             legendEventEnabled={legendEventEnabled}
             onLegendEventChange={updateLegendEventEnabled}
+            big3Mode={big3Mode}
             big3Count={big3Count}
-            onBig3CountChange={updateBig3Count}
+            onBig3Change={updateBig3}
+            superBig3PlayerIds={lockedSuperBig3}
+            onSuperBig3Change={updateSuperBig3PlayerIds}
             hasTeams={stars.size > 0}
             players={availablePlayers}
+            allPlayers={players}
             roles={{ requiredPlayerIds, preferredBenchPlayerIds, unavailablePlayerIds }}
             onRolesChange={updatePlayerRoles}
             hiddenNames={committedNames}
@@ -191,6 +208,8 @@ export function LineupBuilderPage() {
               players={players}
               cap={resultCap}
               onSave={result.success ? handleSaveLineup : undefined}
+              superBig3Locked={lockedSuperBig3.length > 0}
+              onLockSuperBig3={updateSuperBig3PlayerIds}
             />
           ) : (
             <LineupResultPlaceholder benchSize={activeBenchSize} />

@@ -126,6 +126,7 @@ function SavedLineupCard({
               defense: slot.defense,
               award: slot.award ?? null,
               big3: slot.big3Team ? { team: slot.big3Team } : null,
+              superBig3: slot.superBig3 ? {} : null,
             }}
           />
         ))}

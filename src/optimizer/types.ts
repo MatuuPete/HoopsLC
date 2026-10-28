@@ -68,6 +68,8 @@ export interface SavedLineupSlot {
   award?: Award
   /** The team whose Big 3 the player was part of at save time; offense/defense include its bonus. */
   big3Team?: string
+  /** The player was in the Super Big 3 at save time; offense/defense include its bonus. */
+  superBig3?: boolean
 }
 
 /** Bench spots a lineup can have on top of the starting five. */
@@ -121,6 +123,13 @@ export interface LineupPreferences {
    * means off.
    */
   big3?: { maxCount: number; stars: Map<string, string> }
+  /**
+   * Super Big 3: three starters of any team each get +20% of their base
+   * ratings. With `lockedIds` (three player ids) those players start and get
+   * it; with none, the builder picks the best three. Absent means off. Never
+   * set together with `big3`.
+   */
+  superBig3?: { lockedIds: string[] }
 }
 
 export interface LineupSuccess {
@@ -130,6 +139,8 @@ export interface LineupSuccess {
   bench: Player[]
   /** The Big 3s this lineup counts; empty when it has none or the bonus is off. */
   big3s: Big3[]
+  /** The three starters getting the Super Big 3 bonus; empty when it's off. */
+  superBig3: string[]
   /** Starters plus bench: everything that counts against the cap. */
   totalBaseSalary: number
   /** Starting five only. */
@@ -189,6 +200,13 @@ export interface LineupBenchPreferredOverflow {
   benchSize: number
 }
 
+/** A locked Super Big 3 player is set to Out or already in a saved lineup. */
+export interface LineupSuperBig3Unavailable {
+  success: false
+  reason: 'super_big3_unavailable'
+  playerIds: string[]
+}
+
 export type LineupResult =
   | LineupSuccess
   | LineupMissingPosition
@@ -198,3 +216,4 @@ export type LineupResult =
   | LineupXPlayersConflict
   | LineupBenchTooSmall
   | LineupBenchPreferredOverflow
+  | LineupSuperBig3Unavailable

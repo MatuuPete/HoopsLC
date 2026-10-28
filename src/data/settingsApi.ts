@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabaseClient'
 import { MAX_BENCH_SIZE, type ObjectiveMode } from '../optimizer/types'
+import type { Big3Mode } from '../optimizer/big3'
 import type { PlayerRoleLists } from '../optimizer/playerRoles'
 
 const DEFAULT_CAP = 3000
@@ -15,14 +16,18 @@ interface Settings {
   benchSize: number
   preferredBenchPlayerIds: string[]
   legendEventEnabled: boolean
+  big3Mode: Big3Mode
+  /** How many Team Big 3s count, when big3Mode is 'team'. */
   big3Count: number
+  /** A locked Super Big 3; empty means the builder picks it. */
+  superBig3PlayerIds: string[]
 }
 
 export async function getSettings(): Promise<Settings> {
   const { data, error } = await supabase
     .from('settings')
     .select(
-      'salary_cap, required_player_ids, unavailable_player_ids, objective_mode, offense_weight, saved_lineup_count, bench_enabled, bench_size, preferred_bench_player_ids, legend_event_enabled, big3_count',
+      'salary_cap, required_player_ids, unavailable_player_ids, objective_mode, offense_weight, saved_lineup_count, bench_enabled, bench_size, preferred_bench_player_ids, legend_event_enabled, big3_count, big3_mode, super_big3_player_ids',
     )
     .maybeSingle()
   if (error) throw error
@@ -37,7 +42,9 @@ export async function getSettings(): Promise<Settings> {
     benchSize: data?.bench_size ?? MAX_BENCH_SIZE,
     preferredBenchPlayerIds: data?.preferred_bench_player_ids ?? [],
     legendEventEnabled: data?.legend_event_enabled ?? false,
+    big3Mode: (data?.big3_mode as Big3Mode) ?? 'off',
     big3Count: data?.big3_count ?? 0,
+    superBig3PlayerIds: data?.super_big3_player_ids ?? [],
   }
 }
 
@@ -80,8 +87,16 @@ export async function setLegendEventEnabled(userId: string, legendEventEnabled: 
   if (error) throw error
 }
 
-export async function setBig3Count(userId: string, big3Count: number): Promise<void> {
-  const { error } = await supabase.from('settings').upsert({ user_id: userId, big3_count: big3Count })
+/** Saves the Big 3 mode and Team Big 3 count together, so they never disagree. */
+export async function setBig3(userId: string, big3Mode: Big3Mode, big3Count: number): Promise<void> {
+  const { error } = await supabase
+    .from('settings')
+    .upsert({ user_id: userId, big3_mode: big3Mode, big3_count: big3Count })
+  if (error) throw error
+}
+
+export async function setSuperBig3PlayerIds(userId: string, ids: string[]): Promise<void> {
+  const { error } = await supabase.from('settings').upsert({ user_id: userId, super_big3_player_ids: ids })
   if (error) throw error
 }
 

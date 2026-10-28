@@ -1114,6 +1114,160 @@ describe('findBestLineup with Team Big 3', () => {
   })
 })
 
+describe('findBestLineup with Super Big 3', () => {
+  const superBonus = (p: Player) => Math.round(p.offense * 0.2) + Math.round(p.defense * 0.2)
+
+  it('boosts the three starters that make the lineup strongest', () => {
+    const players = [
+      makePlayer({ id: 'pg', positions: ['PG'], offense: 200, defense: 100 }),
+      makePlayer({ id: 'sg', positions: ['SG'], isXPlayer: true, offense: 300, defense: 150 }),
+      makePlayer({ id: 'sf', positions: ['SF'], offense: 50, defense: 50 }),
+      makePlayer({ id: 'pf', positions: ['PF'], offense: 150, defense: 150 }),
+      makePlayer({ id: 'c', positions: ['C'], offense: 60, defense: 40 }),
+    ]
+    const result = findBestLineup(players, 10000, { ...DEFAULT_PREFERENCES, superBig3: { lockedIds: [] } })
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    // The three strongest starters, X Player included, get the 20%.
+    expect([...result.superBig3].sort()).toEqual(['pf', 'pg', 'sg'])
+    expect(result.big3s).toEqual([])
+  })
+
+  it('picks a lineup that only wins once its stars are boosted', () => {
+    // At PG, the star loses to pg-plain on raw power (300 < 310) but wins
+    // with the 20% (300 + 60 > 310), so the Super Big 3 changes the lineup.
+    const players = [
+      makePlayer({ id: 'pg-star', positions: ['PG'], offense: 200, defense: 100 }),
+      makePlayer({ id: 'pg-plain', positions: ['PG'], offense: 210, defense: 100 }),
+      makePlayer({ id: 'sg', positions: ['SG'], isXPlayer: true, offense: 10, defense: 10 }),
+      makePlayer({ id: 'sf', positions: ['SF'], offense: 10, defense: 10 }),
+      makePlayer({ id: 'pf', positions: ['PF'], offense: 10, defense: 10 }),
+      makePlayer({ id: 'c', positions: ['C'], offense: 10, defense: 10 }),
+    ]
+    const result = findBestLineup(players, 10000, { ...DEFAULT_PREFERENCES, superBig3: { lockedIds: [] } })
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.slots.find((s) => s.position === 'PG')?.player.id).toBe('pg-plain')
+    // Boosting pg-plain (+62) beats any other pick, so it's in the trio.
+    expect(result.superBig3).toContain('pg-plain')
+  })
+
+  it('starts and boosts a locked trio, even over stronger players', () => {
+    const players = [
+      makePlayer({ id: 'pg-weak', positions: ['PG'], offense: 10, defense: 10 }),
+      makePlayer({ id: 'pg-strong', positions: ['PG'], offense: 300, defense: 100 }),
+      makePlayer({ id: 'sg', positions: ['SG'], isXPlayer: true }),
+      makePlayer({ id: 'sf', positions: ['SF'] }),
+      makePlayer({ id: 'pf', positions: ['PF'] }),
+      makePlayer({ id: 'c', positions: ['C'] }),
+    ]
+    const locked = ['pg-weak', 'sf', 'c']
+    const result = findBestLineup(players, 10000, { ...DEFAULT_PREFERENCES, superBig3: { lockedIds: locked } })
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.slots.find((s) => s.position === 'PG')?.player.id).toBe('pg-weak')
+    expect(result.superBig3).toEqual(locked)
+  })
+
+  it('reports locked players that are out or already used', () => {
+    const players = [
+      makePlayer({ id: 'pg', positions: ['PG'] }),
+      makePlayer({ id: 'sg-x', positions: ['SG'], isXPlayer: true }),
+      makePlayer({ id: 'sf', positions: ['SF'] }),
+      makePlayer({ id: 'pf', positions: ['PF'] }),
+      makePlayer({ id: 'c', positions: ['C'] }),
+    ]
+    const result = findBestLineup(players, 10000, {
+      ...DEFAULT_PREFERENCES,
+      unavailablePlayerIds: ['pg'],
+      superBig3: { lockedIds: ['pg', 'sf', 'c'] },
+    })
+    expect(result).toEqual({ success: false, reason: 'super_big3_unavailable', playerIds: ['pg'] })
+  })
+
+  it('matches brute force on random small pools', () => {
+    const positions: Player['positions'][number][] = ['PG', 'SG', 'SF', 'PF', 'C']
+    let seed = 99
+    const rand = (n: number) => {
+      seed = (seed * 16807) % 2147483647
+      return seed % n
+    }
+
+    /** Lexicographic best (starter power + top-3 starter bonuses, then bench power). */
+    function bruteForce(players: Player[], cap: number, benchSize: number, required: string[]): [number, number] | null {
+      const power = (p: Player) => p.offense + p.defense
+      let best: [number, number] | null = null
+      function pickStarters(slot: number, starters: Player[], cost: number) {
+        if (slot === positions.length) {
+          if (starters.filter((p) => p.isXPlayer).length !== 1) return
+          if (!required.every((id) => starters.some((p) => p.id === id))) return
+          const bonus = starters.map(superBonus).sort((a, b) => b - a).slice(0, 3).reduce((a, b) => a + b, 0)
+          const rest = players.filter((p) => !starters.includes(p) && !p.isXPlayer)
+          pickBench(rest, 0, benchSize, cost, starters.reduce((s, p) => s + power(p), 0) + bonus, 0)
+          return
+        }
+        for (const p of players) {
+          if (starters.includes(p) || !p.positions.includes(positions[slot])) continue
+          pickStarters(slot + 1, [...starters, p], cost + p.baseSalary)
+        }
+      }
+      function pickBench(rest: Player[], from: number, left: number, cost: number, starters: number, bench: number) {
+        if (left === 0) {
+          if (cost > cap) return
+          if (!best || starters > best[0] || (starters === best[0] && bench > best[1])) best = [starters, bench]
+          return
+        }
+        for (let i = from; i < rest.length; i++) {
+          pickBench(rest, i + 1, left - 1, cost + rest[i].baseSalary, starters, bench + power(rest[i]))
+        }
+      }
+      pickStarters(0, [], 0)
+      return best
+    }
+
+    for (let trial = 0; trial < 150; trial++) {
+      const players: Player[] = Array.from({ length: 8 + rand(3) }, (_, i) =>
+        makePlayer({
+          id: `p${i}`,
+          positions: [...new Set([positions[rand(5)], positions[rand(5)]])],
+          isXPlayer: i < 2,
+          baseSalary: 50 + rand(200),
+          offense: 10 + rand(90),
+          defense: 10 + rand(90),
+        }),
+      )
+      const benchSize = rand(3)
+      const cap = 500 + rand(1200)
+      // Sometimes require a starter, who may then be one of the boosted.
+      const required = trial % 4 === 0 ? [`p${2 + rand(players.length - 2)}`] : []
+
+      const expected = bruteForce(players, cap, benchSize, required)
+      const result = findBestLineup(players, cap, {
+        ...DEFAULT_PREFERENCES,
+        requiredPlayerIds: required,
+        benchSize,
+        superBig3: { lockedIds: [] },
+      })
+      if (!expected) {
+        expect(result.success, `trial ${trial}`).toBe(false)
+        continue
+      }
+      expect(result.success, `trial ${trial}`).toBe(true)
+      if (!result.success) continue
+      const boosted = new Set(result.superBig3)
+      const starters = result.slots.map((s) => s.player)
+      expect(result.superBig3.length, `trial ${trial} size`).toBe(3)
+      expect(result.superBig3.every((id) => starters.some((p) => p.id === id)), `trial ${trial} starters`).toBe(true)
+      const starterTotal = starters.reduce(
+        (sum, p) => sum + p.offense + p.defense + (boosted.has(p.id) ? superBonus(p) : 0),
+        0,
+      )
+      expect(starterTotal, `trial ${trial} starters`).toBe(expected[0])
+      expect(result.bench.reduce((sum, p) => sum + p.offense + p.defense, 0), `trial ${trial} bench`).toBe(expected[1])
+    }
+  })
+})
+
 describe('findBestLineup X Player limit', () => {
   const legend = (id: string, positions: Player['positions'], power = 500) =>
     makePlayer({ id, positions, isXPlayer: true, xTier: 'legend', offense: power / 2, defense: power / 2 })

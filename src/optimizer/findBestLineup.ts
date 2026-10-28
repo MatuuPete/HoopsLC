@@ -7,7 +7,15 @@ import {
   type Position,
 } from './types'
 import { effectiveDefense, effectiveOffense } from './awards'
-import { big3Bonus, big3BonusMap, candidateBig3Sets, type Big3, type Big3Bonus } from './big3'
+import {
+  SUPER_BIG3_SIZE,
+  big3Bonus,
+  big3BonusMap,
+  candidateBig3Sets,
+  superBig3Bonus,
+  type Big3,
+  type Big3Bonus,
+} from './big3'
 import { X_NONE, X_STATES, finalXStates, nextXState, xPlayersFit } from './xRule'
 
 const CENTS = 100
@@ -41,6 +49,8 @@ interface Cell {
   player: Player | null
   /** The starting slot the player fills, or 'bench'. */
   slot: Position | 'bench' | null
+  /** The player starts with the Super Big 3 bonus the builder chose for them. */
+  boosted?: boolean
   source: Cell | null
 }
 
@@ -89,17 +99,28 @@ interface Scoring {
   extraLegendX: boolean
   /** Big 3 bonuses for the run in progress, by player id. */
   bonuses: Map<string, Big3Bonus>
+  /**
+   * How many starters get a Super Big 3 bonus the builder picks itself: 3
+   * when it chooses the Super Big 3, otherwise 0. See runAssignmentDp.
+   */
+  boostLimit: number
 }
 
 function makeScoring(players: Player[], preferences: LineupPreferences): Scoring {
   const benchSize = preferences.benchSize ?? 0
   const extraLegendX = preferences.extraLegendX ?? false
-  const bonuses = new Map<string, Big3Bonus>()
-  if (benchSize === 0) return { preferences, benchSize, starterScale: 1, extraLegendX, bonuses }
-  // Sized as if every player had a Big 3 bonus, so the scale holds in every run.
-  const withBig3 = (p: Player) => (preferences.big3?.maxCount ? big3Bonus(p) : NO_BONUS)
-  const maxValue = players.reduce((max, p) => Math.max(max, computeValue(p, preferences, withBig3(p))), 0)
-  return { preferences, benchSize, starterScale: benchSize * maxValue + 1, extraLegendX, bonuses }
+  const locked = preferences.superBig3?.lockedIds ?? []
+  // A locked Super Big 3 is boosted like a Big 3; otherwise the DP picks whom to boost.
+  const bonuses = new Map(players.filter((p) => locked.includes(p.id)).map((p) => [p.id, superBig3Bonus(p)]))
+  const boostLimit = preferences.superBig3 && locked.length === 0 ? SUPER_BIG3_SIZE : 0
+  const base = { preferences, benchSize, extraLegendX, bonuses, boostLimit }
+  if (benchSize === 0) return { ...base, starterScale: 1 }
+  // Sized as if every player had the largest bonus (Team Big 3's 25% tops the
+  // Super Big 3's 20%), so the scale holds in every run.
+  const anyBonus = !!preferences.big3?.maxCount || !!preferences.superBig3
+  const withBonus = (p: Player) => (anyBonus ? big3Bonus(p) : NO_BONUS)
+  const maxValue = players.reduce((max, p) => Math.max(max, computeValue(p, preferences, withBonus(p))), 0)
+  return { ...base, starterScale: benchSize * maxValue + 1 }
 }
 
 function benchValue(player: Player, scoring: Scoring): number {
@@ -108,6 +129,11 @@ function benchValue(player: Player, scoring: Scoring): number {
 
 function starterValue(player: Player, scoring: Scoring): number {
   return benchValue(player, scoring) * scoring.starterScale
+}
+
+/** A starter's value with the Super Big 3 bonus the DP chose to give them. */
+function boostedStarterValue(player: Player, scoring: Scoring): number {
+  return computeValue(player, scoring.preferences, superBig3Bonus(player)) * scoring.starterScale
 }
 
 function popcount(mask: number): number {
@@ -181,6 +207,7 @@ function extend(
   maxCostCents: number,
   ceiling: ((costCents: number) => number) | null = null,
   minValue = -Infinity,
+  boosted = false,
 ): Cell[] {
   const cells: Cell[] = []
   for (const point of frontier) {
@@ -188,7 +215,7 @@ function extend(
     if (total > maxCostCents) break
     const next = point.value + value
     if (ceiling && next + ceiling(total) < minValue) continue
-    cells.push({ costCents: total, value: next, player, slot, source: point })
+    cells.push({ costCents: total, value: next, player, slot, boosted, source: point })
   }
   return cells
 }
@@ -204,8 +231,13 @@ function extend(
  *
  * Each player either sits out, fills one open starting slot, or (regular
  * players only) takes a bench spot. xState (see xRule) tracks the X Players
- * fielded so far, so a lineup never takes more than the limit. Moves read from a snapshot taken before
- * the player, so no player is used twice.
+ * fielded so far, so a lineup never takes more than the limit. Moves read
+ * from a snapshot taken before the player, so no player is used twice.
+ *
+ * With `boosts`, the first `left` starters this DP adds (beyond the seed's
+ * `seedStarters`) get the Super Big 3 bonus. The caller orders `players`
+ * by what the bonus adds, biggest first, so those are always the starters
+ * the bonus helps most: no extra state is needed to choose them.
  *
  * Points that can't finish under `maxCostCents` are dropped as they appear.
  * Pass Infinity to keep them, which is only needed to find the cheapest
@@ -218,6 +250,7 @@ function runAssignmentDp(
   seeds: Seed[],
   maxCostCents: number,
   pruning: Pruning | null = null,
+  boosts: { left: number; seedStarters: number } | null = null,
 ): Frontier[][][] {
   const { benchSize, extraLegendX } = scoring
   const dp: Frontier[][][] = []
@@ -248,11 +281,13 @@ function runAssignmentDp(
   for (const player of players) {
     const cost = toCents(player.baseSalary)
     const asStarter = starterValue(player, scoring)
+    const asBoosted = boosts ? boostedStarterValue(player, scoring) : 0
     const asBench = benchValue(player, scoring)
     const bits = player.positions.map((p) => ({ position: p, bit: slotBit(p) }))
     const before = dp.map((byXState) => byXState.map((byBench) => [...byBench]))
 
     for (let mask = 0; mask <= FULL_MASK; mask++) {
+      const boosted = !!boosts && popcount(mask) - boosts.seedStarters < boosts.left
       for (const xState of X_STATES) {
         // null: the lineup is out of X Player room, so this player can't start.
         const destXState = nextXState(xState, player, extraLegendX)
@@ -270,10 +305,11 @@ function runAssignmentDp(
                 player,
                 position,
                 cost,
-                asStarter,
+                boosted ? asBoosted : asStarter,
                 limitFor(destMask, bench),
                 ceilingFor(destMask, bench),
                 minValue,
+                boosted,
               )
               if (candidates.length === 0) continue
               dp[destMask][destXState][bench] = mergeFrontier(dp[destMask][destXState][bench], candidates)
@@ -303,14 +339,16 @@ function runAssignmentDp(
   return dp
 }
 
-function reconstruct(cell: Cell): { slots: LineupSlot[]; bench: Player[] } {
+function reconstruct(cell: Cell): { slots: LineupSlot[]; bench: Player[]; boostedIds: string[] } {
   const slots: LineupSlot[] = []
   const bench: Player[] = []
+  const boostedIds: string[] = []
   for (let c: Cell | null = cell; c && c.source; c = c.source) {
     if (c.slot === 'bench') bench.unshift(c.player as Player)
     else slots.unshift({ position: c.slot as Position, player: c.player as Player })
+    if (c.boosted) boostedIds.unshift((c.player as Player).id)
   }
-  return { slots, bench }
+  return { slots, bench, boostedIds }
 }
 
 /** Best (highest-value) point in the frontier at cost <= capCents, or null if none fits. */
@@ -353,6 +391,8 @@ function enumerateRequiredAssignments(requiredPlayers: Player[]): LineupSlot[][]
 interface Seed {
   mask: number
   xState: number
+  /** Super Big 3 boosts already used by the seed's starters. */
+  boost: number
   bench: number
   cell: Cell
 }
@@ -360,20 +400,28 @@ interface Seed {
 /**
  * The starting point for the DP: required starters in their slots, then
  * preferred bench players. The required starters must already fit the X
- * Player limit (findBestLineup checks this up front).
+ * Player limit (findBestLineup checks this up front). Starters in
+ * `boostedIds` get the Super Big 3 bonus the DP is choosing.
  */
-function buildSeed(assignment: LineupSlot[], benchPlayers: Player[], scoring: Scoring): Seed {
+function buildSeed(
+  assignment: LineupSlot[],
+  benchPlayers: Player[],
+  scoring: Scoring,
+  boostedIds: string[] = [],
+): Seed {
   let mask = 0
   let xState = X_NONE
   let cell: Cell = BASE_CELL
   for (const slot of assignment) {
+    const boosted = boostedIds.includes(slot.player.id)
     mask |= slotBit(slot.position)
     xState = nextXState(xState, slot.player, scoring.extraLegendX) as number
     cell = {
       costCents: cell.costCents + toCents(slot.player.baseSalary),
-      value: cell.value + starterValue(slot.player, scoring),
+      value: cell.value + (boosted ? boostedStarterValue(slot.player, scoring) : starterValue(slot.player, scoring)),
       player: slot.player,
       slot: slot.position,
+      boosted,
       source: cell,
     }
   }
@@ -386,7 +434,20 @@ function buildSeed(assignment: LineupSlot[], benchPlayers: Player[], scoring: Sc
       source: cell,
     }
   }
-  return { mask, xState, bench: benchPlayers.length, cell }
+  return { mask, xState, boost: boostedIds.length, bench: benchPlayers.length, cell }
+}
+
+/**
+ * Seeds for one required-player assignment. When the builder picks the
+ * Super Big 3, any of the required starters may be among the boosted, so
+ * there is one seed per way to boost up to boostLimit of them.
+ */
+function buildSeeds(assignment: LineupSlot[], benchPlayers: Player[], scoring: Scoring): Seed[] {
+  const subsets: string[][] = [[]]
+  for (const { player } of assignment) {
+    for (const subset of [...subsets]) if (subset.length < scoring.boostLimit) subsets.push([...subset, player.id])
+  }
+  return subsets.map((boosted) => buildSeed(assignment, benchPlayers, scoring, boosted))
 }
 
 /**
@@ -411,7 +472,7 @@ function placeForced(seed: Seed, forced: Player[], scoring: Scoring): Seed[] {
         slot: position,
         source: seed.cell,
       }
-      seeds.push(...placeForced({ mask: seed.mask | bit, xState, bench: seed.bench, cell }, rest, scoring))
+      seeds.push(...placeForced({ ...seed, mask: seed.mask | bit, xState, cell }, rest, scoring))
     }
   }
   if (!player.isXPlayer && seed.bench < scoring.benchSize) {
@@ -422,7 +483,7 @@ function placeForced(seed: Seed, forced: Player[], scoring: Scoring): Seed[] {
       slot: 'bench',
       source: seed.cell,
     }
-    seeds.push(...placeForced({ mask: seed.mask, xState: seed.xState, bench: seed.bench + 1, cell }, rest, scoring))
+    seeds.push(...placeForced({ ...seed, bench: seed.bench + 1, cell }, rest, scoring))
   }
   return seeds
 }
@@ -478,14 +539,22 @@ export function findBestLineup(
   const available = allPlayers.filter((p) => !preferences.unavailablePlayerIds.includes(p.id))
   const preferredBenchIds = (preferences.benchSize ?? 0) > 0 ? (preferences.preferredBenchPlayerIds ?? []) : []
 
+  // A locked Super Big 3 must start, so its players join the required starters.
+  const lockedSuper = preferences.superBig3?.lockedIds ?? []
+  const missingLocked = lockedSuper.filter((id) => !available.some((p) => p.id === id))
+  if (missingLocked.length > 0) {
+    return { success: false, reason: 'super_big3_unavailable', playerIds: missingLocked }
+  }
+  const requiredIds = [...new Set([...preferences.requiredPlayerIds, ...lockedSuper])]
+
   const preferredForBoth = available
-    .filter((p) => preferences.requiredPlayerIds.includes(p.id) && preferredBenchIds.includes(p.id))
+    .filter((p) => requiredIds.includes(p.id) && preferredBenchIds.includes(p.id))
     .map((p) => p.id)
   if (preferredForBoth.length > 0) {
     return { success: false, reason: 'required_players_conflict', conflictingPlayerIds: preferredForBoth }
   }
 
-  const deduped = dedupeCatalogCopies(available, [...preferences.requiredPlayerIds, ...preferredBenchIds])
+  const deduped = dedupeCatalogCopies(available, [...requiredIds, ...preferredBenchIds])
   if (!deduped.ok) {
     return {
       success: false,
@@ -514,7 +583,7 @@ export function findBestLineup(
     return { success: false, reason: 'missing_position', missingPositions }
   }
 
-  const requiredPlayers = players.filter((p) => preferences.requiredPlayerIds.includes(p.id))
+  const requiredPlayers = players.filter((p) => requiredIds.includes(p.id))
   const extraLegendX = preferences.extraLegendX ?? false
   if (!xPlayersFit(requiredPlayers, extraLegendX)) {
     return {
@@ -563,12 +632,14 @@ export function findBestLineup(
     big3s: Big3[] = [],
     minValue = -Infinity,
   ): Frontier[] {
-    const runScoring: Scoring = { ...scoring, bonuses: big3BonusMap(big3s, players) }
-    const seed = buildSeed(assignment, benchPlayers, runScoring)
+    // Without Big 3s, keep the scoring's own bonuses (a locked Super Big 3).
+    const runScoring: Scoring = big3s.length > 0 ? { ...scoring, bonuses: big3BonusMap(big3s, players) } : scoring
     const placedIds = new Set([...assignment.map((s) => s.player.id), ...benchPlayers.map((p) => p.id)])
     const forced = players.filter((p) => runScoring.bonuses.has(p.id) && !placedIds.has(p.id))
     const pruning = bound && minValue > -Infinity ? { bound, minValue } : null
-    const seeds = placeForced(seed, forced, runScoring).filter(
+    const seeds = buildSeeds(assignment, benchPlayers, runScoring)
+      .flatMap((seed) => placeForced(seed, forced, runScoring))
+      .filter(
       (s) =>
         !pruning ||
         s.cell.value +
@@ -578,12 +649,29 @@ export function findBestLineup(
     if (seeds.length === 0) return Array.from({ length: benchSize + 1 }, () => [])
     const usedIds = new Set([...placedIds, ...forced.map((p) => p.id)])
     const remainingPlayers = players.filter((p) => !usedIds.has(p.id))
-    const sortedPlayers = [...remainingPlayers].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
-    const byXState = runAssignmentDp(sortedPlayers, runScoring, seeds, maxCostCents, pruning)[FULL_MASK]
-    // Every X state a finished lineup may end in, merged into one frontier per bench size.
-    return Array.from({ length: benchSize + 1 }, (_, bench) =>
-      finalXStates(extraLegendX).reduce<Frontier>((merged, x) => mergeFrontier(merged, byXState[x][bench]), []),
-    )
+    const byId = (a: Player, b: Player) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+
+    // Seeds that boosted the same number of required starters share one run;
+    // each run boosts the rest of its trio from the players it adds.
+    const groups = new Map<number, Seed[]>()
+    for (const seed of seeds) groups.set(seed.boost, [...(groups.get(seed.boost) ?? []), seed])
+    const gain = (p: Player) => boostedStarterValue(p, runScoring) - starterValue(p, runScoring)
+    const sortedPlayers =
+      runScoring.boostLimit > 0
+        ? [...remainingPlayers].sort((a, b) => gain(b) - gain(a) || byId(a, b))
+        : [...remainingPlayers].sort(byId)
+
+    const merged: Frontier[] = Array.from({ length: benchSize + 1 }, () => [])
+    for (const [boost, group] of groups) {
+      const boosts =
+        runScoring.boostLimit > 0 ? { left: runScoring.boostLimit - boost, seedStarters: assignment.length } : null
+      const byXState = runAssignmentDp(sortedPlayers, runScoring, group, maxCostCents, pruning, boosts)[FULL_MASK]
+      // Every X state a finished lineup may end in, merged into one frontier per bench size.
+      for (let bench = 0; bench <= benchSize; bench++) {
+        for (const x of finalXStates(extraLegendX)) merged[bench] = mergeFrontier(merged[bench], byXState[x][bench])
+      }
+    }
+    return merged
   }
 
   let bestFeasible: Cell | null = null
@@ -644,12 +732,13 @@ export function findBestLineup(
     }
   }
 
-  const { slots, bench } = reconstruct(bestFeasible)
+  const { slots, bench, boostedIds } = reconstruct(bestFeasible)
   return {
     success: true,
     slots,
     bench,
     big3s: bestBig3s,
+    superBig3: lockedSuper.length > 0 ? lockedSuper : boostedIds,
     totalBaseSalary: bestFeasible.costCents / CENTS,
     totalCurrentSalary: totalCurrentSalary(slots),
     remainingCap: salaryCap - bestFeasible.costCents / CENTS,

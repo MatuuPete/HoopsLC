@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { awardFor, effectiveDefense, effectiveOffense } from '../optimizer/awards'
-import { big3BonusMap, type Big3, type Big3Tag } from '../optimizer/big3'
+import { big3BonusMap, superBig3Bonus, type Big3, type Big3Bonus, type Big3Tag } from '../optimizer/big3'
 import { POSITIONS, type LineupResult, type LineupSlot, type Player } from '../optimizer/types'
 import {
   BenchRow,
@@ -13,7 +13,7 @@ import {
   type SlotView,
 } from './LineupParts'
 
-/** Offense, defense and badges for one player, Big 3 bonus included. */
+/** Offense, defense and badges for one player, Team Big 3 bonus included. */
 function playerStats(player: Player, tag: Big3Tag | undefined) {
   return {
     offense: effectiveOffense(player) + (tag?.offense ?? 0),
@@ -23,13 +23,18 @@ function playerStats(player: Player, tag: Big3Tag | undefined) {
   }
 }
 
-function toSlotView(slot: LineupSlot, tags: Map<string, Big3Tag>): SlotView {
+function toSlotView(slot: LineupSlot, tags: Map<string, Big3Tag>, superIds: Set<string>): SlotView {
+  const stats = playerStats(slot.player, tags.get(slot.player.id))
+  const bonus: Big3Bonus | null = superIds.has(slot.player.id) ? superBig3Bonus(slot.player) : null
   return {
     position: slot.position,
     name: slot.player.name,
     xTier: slot.player.xTier,
     salary: slot.player.baseSalary,
-    ...playerStats(slot.player, tags.get(slot.player.id)),
+    ...stats,
+    offense: stats.offense + (bonus?.offense ?? 0),
+    defense: stats.defense + (bonus?.defense ?? 0),
+    superBig3: bonus ? { bonus } : null,
   }
 }
 
@@ -53,6 +58,10 @@ interface LineupResultPanelProps {
   /** The salary cap the result was calculated against. */
   cap: number
   onSave?: () => Promise<void>
+  /** Whether the Super Big 3 in the result is one the user locked, not the builder's pick. */
+  superBig3Locked?: boolean
+  /** Locks the builder's Super Big 3 pick, shown as a button on the result. */
+  onLockSuperBig3?: (playerIds: string[]) => Promise<void>
 }
 
 function SaveLineupButton({ onSave }: { onSave: () => Promise<void> }) {
@@ -113,11 +122,66 @@ function Big3Strip({ big3s, players }: { big3s: Big3[]; players: Player[] }) {
   )
 }
 
+/** The Super Big 3 a lineup fields, with a button to lock the builder's pick. */
+function SuperBig3Strip({
+  playerIds,
+  players,
+  locked,
+  onLock,
+}: {
+  playerIds: string[]
+  players: Player[]
+  locked: boolean
+  onLock?: (playerIds: string[]) => Promise<void>
+}) {
+  const [status, setStatus] = useState<'idle' | 'locking' | 'locked'>(locked ? 'locked' : 'idle')
+  async function lock() {
+    if (!onLock) return
+    setStatus('locking')
+    try {
+      await onLock(playerIds)
+      setStatus('locked')
+    } catch {
+      setStatus('idle')
+    }
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-border bg-star/[0.06] px-5 py-3 text-xs">
+      <span className="shrink-0 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-star">
+        ★★ Super Big 3
+      </span>
+      <span className="min-w-0 flex-1 truncate text-text/85">
+        {playerIds.map((id) => players.find((p) => p.id === id)?.name ?? id).join(', ')}
+      </span>
+      <span className="font-mono text-[11px] text-muted">+20%</span>
+      {status === 'locked' ? (
+        <span className="rounded-sm border border-star/40 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-star">
+          Locked
+        </span>
+      ) : (
+        onLock && (
+          <button
+            type="button"
+            onClick={lock}
+            disabled={status === 'locking'}
+            className="rounded-md border border-star/50 px-2 py-1 text-[11px] font-medium text-star transition-colors hover:bg-star/10 disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+          >
+            {status === 'locking' ? 'Locking…' : 'Lock these 3'}
+          </button>
+        )
+      )}
+    </div>
+  )
+}
+
 function LineupCard({
   title,
   slots,
   bench,
   big3s = [],
+  superBig3 = [],
+  superBig3Locked = false,
+  onLockSuperBig3,
   cap,
   action,
 }: {
@@ -125,13 +189,17 @@ function LineupCard({
   slots: LineupSlot[]
   bench: Player[]
   big3s?: Big3[]
+  superBig3?: string[]
+  superBig3Locked?: boolean
+  onLockSuperBig3?: (playerIds: string[]) => Promise<void>
   cap: number
   action?: ReactNode
 }) {
   const fielded = [...slots.map((s) => s.player), ...bench]
   const tags = big3BonusMap(big3s, fielded)
+  const superIds = new Set(superBig3)
   const views = slots
-    .map((slot) => toSlotView(slot, tags))
+    .map((slot) => toSlotView(slot, tags, superIds))
     .sort((a, b) => POSITIONS.indexOf(a.position) - POSITIONS.indexOf(b.position))
   const benchViews = bench
     .map((player) => toBenchView(player, tags))
@@ -158,6 +226,14 @@ function LineupCard({
       </div>
 
       {big3s.length > 0 && <Big3Strip big3s={big3s} players={fielded} />}
+      {superBig3.length > 0 && (
+        <SuperBig3Strip
+          playerIds={superBig3}
+          players={fielded}
+          locked={superBig3Locked}
+          onLock={onLockSuperBig3}
+        />
+      )}
 
       <div className="border-t border-border px-5">
         {hasBench && <GroupHeader label="Starting five" />}
@@ -197,7 +273,7 @@ function LineupCard({
       </div>
       <p className="border-t border-border px-5 py-3 text-[11px] text-muted">
         {hasBench && 'Totals are for the starting five; bench salaries still count against the cap. '}
-        Offense and defense include award{big3s.length > 0 && ' and Big 3'} bonuses. TPower totals exclude kits. Salaries shown are
+        Offense and defense include award{big3s.length > 0 || superBig3.length > 0 ? ' and Big 3' : ''} bonuses. TPower totals exclude kits. Salaries shown are
         what you own each player at.
       </p>
     </section>
@@ -244,8 +320,25 @@ export function LineupResultPlaceholder({ benchSize }: { benchSize: number }) {
   )
 }
 
-export function LineupResultPanel({ result, players, cap, onSave }: LineupResultPanelProps) {
+export function LineupResultPanel({
+  result,
+  players,
+  cap,
+  onSave,
+  superBig3Locked = false,
+  onLockSuperBig3,
+}: LineupResultPanelProps) {
   if (!result) return null
+
+  if (!result.success && result.reason === 'super_big3_unavailable') {
+    const names = result.playerIds.map((id) => players.find((p) => p.id === id)?.name ?? id).join(', ')
+    return (
+      <Notice title="Your locked Super Big 3 can't play">
+        {names} {result.playerIds.length === 1 ? 'is' : 'are'} set to Out or already in a saved lineup. Choose
+        another player for your Super Big 3, or switch back to the suggestion.
+      </Notice>
+    )
+  }
 
   if (!result.success && result.reason === 'missing_position') {
     return (
@@ -338,6 +431,9 @@ export function LineupResultPanel({ result, players, cap, onSave }: LineupResult
       slots={result.slots}
       bench={result.bench}
       big3s={result.big3s}
+      superBig3={result.superBig3}
+      superBig3Locked={superBig3Locked}
+      onLockSuperBig3={onLockSuperBig3}
       cap={result.totalBaseSalary + result.remainingCap}
       action={onSave && <SaveLineupButton onSave={onSave} />}
     />

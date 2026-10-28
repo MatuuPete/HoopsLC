@@ -1,9 +1,10 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { MAX_BENCH_SIZE, type ObjectiveMode, type Player } from '../optimizer/types'
-import { MAX_BIG3_COUNT } from '../optimizer/big3'
+import { MAX_BIG3_COUNT, SUPER_BIG3_SIZE, type Big3Mode } from '../optimizer/big3'
 import type { PlayerRoleLists } from '../optimizer/playerRoles'
 import { Eyebrow, Switch, TierBadge } from './LineupParts'
 import { PlayerRolePicker } from './PlayerRolePicker'
+import { SearchInput } from './ui'
 import { SalaryCapField } from './SalaryCapField'
 
 export interface LineupSettingsPanelProps {
@@ -20,12 +21,19 @@ export interface LineupSettingsPanelProps {
   legendEventEnabled: boolean
   onLegendEventChange: (enabled: boolean) => void
   /** How many Team Big 3s a lineup may count: 0 (off), 1 or 2. */
+  /** Which Big 3 bonus the builder uses, and how many Team Big 3s count. */
+  big3Mode: Big3Mode
   big3Count: number
-  onBig3CountChange: (count: number) => void
+  onBig3Change: (mode: Big3Mode, count: number) => void
+  /** A locked Super Big 3 (three owned, available players); empty means the builder picks. */
+  superBig3PlayerIds: string[]
+  onSuperBig3Change: (playerIds: string[]) => void
   /** Whether any catalog player has a team yet; without teams there are no stars. */
   hasTeams: boolean
   /** Owned players not locked into a saved lineup. */
   players: Player[]
+  /** Every owned player, to name a locked Super Big 3 even if one is in a saved lineup. */
+  allPlayers: Player[]
   roles: PlayerRoleLists
   onRolesChange: (roles: PlayerRoleLists) => void
   /** Names of owned players hidden because a saved lineup already uses them. */
@@ -50,10 +58,14 @@ export function LineupSettingsPanel({
   onBenchSizeChange,
   legendEventEnabled,
   onLegendEventChange,
+  big3Mode,
   big3Count,
-  onBig3CountChange,
+  onBig3Change,
+  superBig3PlayerIds,
+  onSuperBig3Change,
   hasTeams,
   players,
+  allPlayers,
   roles,
   onRolesChange,
   hiddenNames,
@@ -145,7 +157,16 @@ export function LineupSettingsPanel({
 
         <LegendEventCard enabled={legendEventEnabled} onChange={onLegendEventChange} />
 
-        <Big3Card count={big3Count} onChange={onBig3CountChange} hasTeams={hasTeams} />
+        <Big3Card
+          mode={big3Mode}
+          count={big3Count}
+          onChange={onBig3Change}
+          hasTeams={hasTeams}
+          players={players}
+          allPlayers={allPlayers}
+          lockedIds={superBig3PlayerIds}
+          onLockedChange={onSuperBig3Change}
+        />
       </div>
 
       <div className="flex flex-col gap-3 border-t border-border p-5">
@@ -243,26 +264,37 @@ function LegendEventCard({ enabled, onChange }: { enabled: boolean; onChange: (e
   )
 }
 
-const BIG3_CAPTIONS = [
-  'Off: no Big 3 bonus',
-  'Three stars of one team: +25% each',
-  'Up to two teams, three stars each: +25%',
+const BIG3_MODES: { mode: Big3Mode; label: string }[] = [
+  { mode: 'off', label: 'Off' },
+  { mode: 'team', label: 'Team Big 3' },
+  { mode: 'super', label: 'Super Big 3' },
 ]
 
 /**
- * The Team Big 3 setting: off, or how many Big 3s a lineup may count. A
- * team's stars are its five highest-priced catalog players.
+ * The Big 3 setting: off, Team Big 3 (three stars of one team, +25%), or
+ * Super Big 3 (any three starters, +20%). Only one applies to a lineup.
  */
 function Big3Card({
+  mode,
   count,
   onChange,
   hasTeams,
+  players,
+  allPlayers,
+  lockedIds,
+  onLockedChange,
 }: {
+  mode: Big3Mode
   count: number
-  onChange: (count: number) => void
+  onChange: (mode: Big3Mode, count: number) => void
   hasTeams: boolean
+  players: Player[]
+  allPlayers: Player[]
+  lockedIds: string[]
+  onLockedChange: (playerIds: string[]) => void
 }) {
-  const on = count > 0
+  const on = mode !== 'off'
+  const teamCount = Math.max(1, count)
   return (
     <div
       className={`flex flex-col gap-3 rounded-lg border p-3 transition-colors ${
@@ -271,30 +303,215 @@ function Big3Card({
     >
       <div className="flex min-w-0 flex-col gap-0.5">
         <span id="big3-label" className="flex items-center gap-1.5 text-sm font-medium text-text">
-          Team Big 3
+          Big 3 bonus
           <span aria-hidden className={on ? 'text-star' : 'text-muted'}>
-            ★
+            {mode === 'super' ? '★★' : '★'}
           </span>
         </span>
-        <span className="text-xs text-muted">{BIG3_CAPTIONS[count] ?? BIG3_CAPTIONS[0]}</span>
+        <span className="text-xs text-muted">
+          {mode === 'off'
+            ? 'Off: no Big 3 bonus'
+            : mode === 'team'
+              ? teamCount === 1
+                ? 'Three stars of one team: +25% each'
+                : 'Up to two teams, three stars each: +25%'
+              : 'Any three starters you choose: +20% each'}
+        </span>
       </div>
       <div
         role="radiogroup"
         aria-labelledby="big3-label"
         className="grid grid-cols-3 gap-1 rounded-md border border-border bg-bg p-1"
       >
-        {Array.from({ length: MAX_BIG3_COUNT + 1 }, (_, i) => i).map((option) => (
-          <SegmentButton key={option} active={count === option} onClick={() => onChange(option)}>
-            {option === 0 ? 'Off' : <span className="font-mono tabular-nums">{option}</span>}
+        {BIG3_MODES.map((option) => (
+          <SegmentButton
+            key={option.mode}
+            active={mode === option.mode}
+            onClick={() => onChange(option.mode, option.mode === 'team' ? teamCount : count)}
+          >
+            <span className="text-[13px]">{option.label}</span>
           </SegmentButton>
         ))}
       </div>
-      {on && !hasTeams && (
-        <p className="text-[11px] leading-relaxed text-muted">
-          No teams in the catalog yet. Add a <span className="font-mono text-text/80">team</span> to each
-          player in the catalog import to find each team's stars.
+
+      {mode === 'team' && (
+        <>
+          <div className="flex items-center justify-between gap-3">
+            <span id="big3-count-label" className="text-xs text-muted">
+              Big 3s per lineup
+            </span>
+            <div
+              role="radiogroup"
+              aria-labelledby="big3-count-label"
+              className="grid w-28 grid-cols-2 gap-1 rounded-md border border-border bg-bg p-1"
+            >
+              {Array.from({ length: MAX_BIG3_COUNT }, (_, i) => i + 1).map((option) => (
+                <SegmentButton key={option} active={teamCount === option} onClick={() => onChange('team', option)}>
+                  <span className="font-mono tabular-nums">{option}</span>
+                </SegmentButton>
+              ))}
+            </div>
+          </div>
+          {!hasTeams && (
+            <p className="text-[11px] leading-relaxed text-muted">
+              No teams in the catalog yet. Add a <span className="font-mono text-text/80">team</span> to each
+              player in the catalog import to find each team's stars.
+            </p>
+          )}
+        </>
+      )}
+
+      {mode === 'super' && (
+        <SuperBig3Picker players={players} allPlayers={allPlayers} lockedIds={lockedIds} onChange={onLockedChange} />
+      )}
+    </div>
+  )
+}
+
+/**
+ * Who gets the Super Big 3: the builder's pick by default, or three
+ * players you lock in. Locked players always start.
+ */
+function SuperBig3Picker({
+  players,
+  allPlayers,
+  lockedIds,
+  onChange,
+}: {
+  players: Player[]
+  allPlayers: Player[]
+  lockedIds: string[]
+  onChange: (playerIds: string[]) => void
+}) {
+  const [choosing, setChoosing] = useState(false)
+  const [draft, setDraft] = useState<string[]>(lockedIds)
+  const [search, setSearch] = useState('')
+  const locked = lockedIds.map((id) => allPlayers.find((p) => p.id === id)).filter((p): p is Player => !!p)
+
+  function toggle(id: string) {
+    setDraft((current) =>
+      current.includes(id)
+        ? current.filter((x) => x !== id)
+        : current.length < SUPER_BIG3_SIZE
+          ? [...current, id]
+          : current,
+    )
+  }
+
+  if (choosing) {
+    const query = search.trim().toLowerCase()
+    const visible = players.filter((p) => query === '' || p.name.toLowerCase().includes(query))
+    return (
+      <div className="flex flex-col gap-2 rounded-md border border-border bg-bg p-2">
+        <div className="flex items-center justify-between gap-2 px-1">
+          <span className="text-xs text-text">Choose 3 starters</span>
+          <span className="font-mono text-[11px] tabular-nums text-muted">
+            {draft.length} / {SUPER_BIG3_SIZE}
+          </span>
+        </div>
+        <SearchInput value={search} onChange={setSearch} placeholder="Search players" label="Search players" />
+        <ul className="scrollbar-slim flex max-h-56 flex-col gap-0.5 overflow-y-auto">
+          {visible.map((p) => {
+            const picked = draft.includes(p.id)
+            const full = !picked && draft.length >= SUPER_BIG3_SIZE
+            return (
+              <li key={p.id}>
+                <button
+                  type="button"
+                  role="checkbox"
+                  aria-checked={picked}
+                  disabled={full}
+                  onClick={() => toggle(p.id)}
+                  className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+                    picked ? 'bg-star/10 text-text' : full ? 'text-muted/50' : 'text-text/85 hover:bg-white/[0.05]'
+                  }`}
+                >
+                  <span
+                    aria-hidden
+                    className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border text-[9px] ${
+                      picked ? 'border-star bg-star text-ink' : 'border-border'
+                    }`}
+                  >
+                    {picked ? '✓' : ''}
+                  </span>
+                  <span className="truncate">{p.name}</span>
+                  {p.xTier && <TierBadge tier={p.xTier} />}
+                  <span className="ml-auto font-mono text-[11px] text-muted">{p.positions.join('/')}</span>
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+        <div className="flex justify-end gap-2 border-t border-border pt-2">
+          <button
+            type="button"
+            onClick={() => {
+              setChoosing(false)
+              setDraft(lockedIds)
+            }}
+            className="rounded-md px-2.5 py-1 text-xs text-muted hover:text-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={draft.length !== SUPER_BIG3_SIZE}
+            onClick={() => {
+              onChange(draft)
+              setChoosing(false)
+            }}
+            className="rounded-md bg-star px-2.5 py-1 text-xs font-semibold text-ink transition-opacity disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            Lock these 3
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {locked.length === SUPER_BIG3_SIZE ? (
+        <ul aria-label="Locked Super Big 3" className="flex flex-wrap gap-1.5">
+          {locked.map((p) => (
+            <li
+              key={p.id}
+              className="flex items-center gap-1.5 rounded-full border border-star/40 bg-star/[0.08] px-2.5 py-1 text-xs text-text"
+            >
+              <span aria-hidden className="text-star">
+                ★
+              </span>
+              {p.name}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-xs leading-relaxed text-muted">
+          <span className="text-text/85">Suggested:</span> the builder boosts the three starters that make your
+          lineup strongest under the cap.
         </p>
       )}
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+        <button
+          type="button"
+          onClick={() => {
+            setDraft(locked.length === SUPER_BIG3_SIZE ? lockedIds : [])
+            setChoosing(true)
+          }}
+          className="text-text underline decoration-border underline-offset-2 hover:decoration-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+        >
+          {locked.length === SUPER_BIG3_SIZE ? 'Change players' : 'Choose 3 players'}
+        </button>
+        {locked.length === SUPER_BIG3_SIZE && (
+          <button
+            type="button"
+            onClick={() => onChange([])}
+            className="text-muted underline decoration-border underline-offset-2 hover:text-text hover:decoration-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+          >
+            Use suggestion
+          </button>
+        )}
+      </div>
     </div>
   )
 }

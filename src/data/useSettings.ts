@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   getSettings,
   setBenchEnabled,
-  setBig3Count,
+  setBig3,
+  setSuperBig3PlayerIds,
   setBenchSize,
   setLegendEventEnabled,
   setObjectiveMode,
@@ -14,6 +15,7 @@ import {
 import { MAX_BENCH_SIZE, type ObjectiveMode } from '../optimizer/types'
 import type { PlayerRoleLists } from '../optimizer/playerRoles'
 import { useAuth } from '../auth/AuthContext'
+import type { Big3Mode } from '../optimizer/big3'
 
 export function useSettings() {
   const { session } = useAuth()
@@ -27,7 +29,9 @@ export function useSettings() {
   const [benchSize, setBenchSizeState] = useState(MAX_BENCH_SIZE)
   const [preferredBenchPlayerIds, setPreferredBenchPlayerIdsState] = useState<string[]>([])
   const [legendEventEnabled, setLegendEventEnabledState] = useState(false)
+  const [big3Mode, setBig3ModeState] = useState<Big3Mode>('off')
   const [big3Count, setBig3CountState] = useState(0)
+  const [superBig3PlayerIds, setSuperBig3PlayerIdsState] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const roleSaves = useRef<Promise<void>>(Promise.resolve())
@@ -48,7 +52,9 @@ export function useSettings() {
       setBenchSizeState(settings.benchSize)
       setPreferredBenchPlayerIdsState(settings.preferredBenchPlayerIds)
       setLegendEventEnabledState(settings.legendEventEnabled)
+      setBig3ModeState(settings.big3Mode)
       setBig3CountState(settings.big3Count)
+      setSuperBig3PlayerIdsState(settings.superBig3PlayerIds)
       setError(null)
     } catch (err) {
       setError(`Couldn't load your settings: ${errorMessage(err)}`)
@@ -107,9 +113,19 @@ export function useSettings() {
     if (await save(() => setLegendEventEnabled(session.user.id, value))) setLegendEventEnabledState(value)
   }
 
-  async function updateBig3Count(value: number) {
+  /** Off clears the Team Big 3 count too, so turning it back on starts from 1. */
+  async function updateBig3(mode: Big3Mode, count: number) {
     if (!session) return
-    if (await save(() => setBig3Count(session.user.id, value))) setBig3CountState(value)
+    const nextCount = mode === 'off' ? 0 : count
+    if (await save(() => setBig3(session.user.id, mode, nextCount))) {
+      setBig3ModeState(mode)
+      setBig3CountState(nextCount)
+    }
+  }
+
+  async function updateSuperBig3PlayerIds(ids: string[]) {
+    if (!session) return
+    if (await save(() => setSuperBig3PlayerIds(session.user.id, ids))) setSuperBig3PlayerIdsState(ids)
   }
 
   // Role buttons get clicked in quick succession, so the lists update on
@@ -136,7 +152,9 @@ export function useSettings() {
     benchSize,
     preferredBenchPlayerIds,
     legendEventEnabled,
+    big3Mode,
     big3Count,
+    superBig3PlayerIds,
     loading,
     error,
     updateSalaryCap,
@@ -146,7 +164,8 @@ export function useSettings() {
     updateBenchEnabled,
     updateBenchSize,
     updateLegendEventEnabled,
-    updateBig3Count,
+    updateBig3,
+    updateSuperBig3PlayerIds,
     updatePlayerRoles,
   }
 }

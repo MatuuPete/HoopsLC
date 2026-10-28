@@ -107,13 +107,25 @@ const STEPS: Step[] = [
             ends.
           </li>
           <li>
-            <Ui>Team Big 3</Ui>: each team's five highest-priced players are its stars, marked ★ on
-            the Players page. Three stars from one team in a lineup, starters or bench, form a Big 3,
-            and each of the three gets +25% of their offense and defense. Pick <Ui>1</Ui> to allow one
-            Big 3 per lineup or <Ui>2</Ui> for up to two from different teams. An X Player you give a
-            team can join that team's Big 3 too, such as an X Player set to DEN with two Denver stars,
-            and gets the same +25%. The builder only fields a Big 3 when it makes the lineup stronger,
-            and marks those players B3.
+            <Ui>Big 3 bonus</Ui>: pick <Ui>Off</Ui>, <Ui>Team Big 3</Ui> or <Ui>Super Big 3</Ui>. Only
+            one applies to a lineup.
+            <ul>
+              <li>
+                <Ui>Team Big 3</Ui>: each team's five highest-priced players are its stars, marked ★ on
+                the Players page. Three stars from one team in a lineup, starters or bench, form a Big 3,
+                and each of the three gets +25% of their offense and defense. Choose <Ui>1</Ui> Big 3
+                per lineup or <Ui>2</Ui> from different teams. X Players from the X Pool join their
+                team's Big 3 too. The builder only fields a Big 3 when it makes the lineup stronger, and
+                marks those players B3.
+              </li>
+              <li>
+                <Ui>Super Big 3</Ui>: any three starters, from any teams and including X Players, each
+                get +20%. By default the builder picks the three that make your lineup strongest under
+                the cap. Press <Ui>Lock these 3</Ui> on the result to keep them, or{' '}
+                <Ui>Choose 3 players</Ui> to pick your own; locked players always start. Super Big 3
+                players are marked SB3.
+              </li>
+            </ul>
           </li>
           <li>
             <Ui>Players</Ui>: one searchable list where each player has three buttons.{' '}

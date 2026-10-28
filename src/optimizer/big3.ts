@@ -9,6 +9,15 @@ export const BIG3_SIZE = 3
 /** Each Big 3 player gets this share of their base offense and defense on top. */
 export const BIG3_BONUS_RATE = 0.25
 
+/** A Super Big 3 starter gets this share of their base offense and defense on top. */
+export const SUPER_BIG3_BONUS_RATE = 0.2
+
+/** How many starters a Super Big 3 boosts. */
+export const SUPER_BIG3_SIZE = 3
+
+/** Which Big 3 bonus the lineup builder uses: none, Team Big 3s, or a Super Big 3. */
+export type Big3Mode = 'off' | 'team' | 'super'
+
 /** The most Big 3s a lineup may count: 0 turns the bonus off. */
 export const MAX_BIG3_COUNT = 2
 
@@ -73,6 +82,14 @@ export function big3Bonus(player: Pick<Player, 'offense' | 'defense'>): Big3Bonu
   return {
     offense: Math.round(player.offense * BIG3_BONUS_RATE),
     defense: Math.round(player.defense * BIG3_BONUS_RATE),
+  }
+}
+
+/** The Super Big 3 bonus on a player's base ratings, e.g. 249/119 → +50/+24. */
+export function superBig3Bonus(player: Pick<Player, 'offense' | 'defense'>): Big3Bonus {
+  return {
+    offense: Math.round(player.offense * SUPER_BIG3_BONUS_RATE),
+    defense: Math.round(player.defense * SUPER_BIG3_BONUS_RATE),
   }
 }
 

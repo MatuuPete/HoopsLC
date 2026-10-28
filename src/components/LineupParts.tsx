@@ -60,6 +60,24 @@ export function Big3Badge({ big3 }: { big3: Big3View }) {
   )
 }
 
+/** A Super Big 3 starter's badge; `bonus` is absent on saved lineups, whose stats include it. */
+export interface SuperBig3View {
+  bonus?: Big3Bonus
+}
+
+/** A Super Big 3 starter: solid gold, where a Team Big 3 badge is outlined. */
+export function SuperBig3Badge({ superBig3 }: { superBig3: SuperBig3View }) {
+  const bonus = superBig3.bonus ? `: +${superBig3.bonus.offense} OFF / +${superBig3.bonus.defense} DEF` : ''
+  return (
+    <span
+      title={`Super Big 3${bonus}`}
+      className="inline-flex h-4 shrink-0 items-center rounded-sm border border-star bg-star px-1 font-mono text-[10px] font-semibold leading-none text-ink"
+    >
+      SB3
+    </span>
+  )
+}
+
 export interface SlotView {
   position: Position
   name: string
@@ -70,6 +88,7 @@ export interface SlotView {
   defense: number
   award: Award | null
   big3: Big3View | null
+  superBig3: SuperBig3View | null
 }
 
 /** One position in a lineup. `lg` is the result card, `sm` the saved-lineup cards. */
@@ -83,6 +102,7 @@ export function SlotRow({ slot, size = 'lg' }: { slot: SlotView; size?: 'lg' | '
           {slot.xTier && <TierBadge tier={slot.xTier} />}
           {slot.award && <AwardBadge award={slot.award} />}
           {slot.big3 && <Big3Badge big3={slot.big3} />}
+          {slot.superBig3 && <SuperBig3Badge superBig3={slot.superBig3} />}
         </span>
         <span className="font-mono text-xs tabular-nums text-text">{slot.salary}</span>
       </li>
@@ -100,6 +120,7 @@ export function SlotRow({ slot, size = 'lg' }: { slot: SlotView; size?: 'lg' | '
           {slot.xTier && <TierBadge tier={slot.xTier} />}
           {slot.award && <AwardBadge award={slot.award} />}
           {slot.big3 && <Big3Badge big3={slot.big3} />}
+          {slot.superBig3 && <SuperBig3Badge superBig3={slot.superBig3} />}
         </span>
         <span className="font-mono text-[11px] tabular-nums text-muted">
           OFF {slot.offense} <span className="text-border">/</span> DEF {slot.defense}
