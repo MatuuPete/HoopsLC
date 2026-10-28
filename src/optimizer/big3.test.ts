@@ -96,7 +96,21 @@ describe('candidateBig3Sets', () => {
     expect(pairs.every(([a, b]) => a.team !== b.team)).toBe(true)
   })
 
-  it('ignores X Players and unlinked players', () => {
+  it('counts an X Player with a team toward that team, beyond its catalog stars', () => {
+    const roster = [
+      makePlayer('melo', { isXPlayer: true, xTier: 'standard', catalogPlayerId: null, team: 'LAL' }),
+      makePlayer('l1'),
+      makePlayer('l2', { catalogPlayerId: null }),
+    ]
+    const lakers = new Map([['l1', 'LAL'], ['l2', 'LAL']])
+    // Only melo and l1 are stars (l2 is unlinked), so no trio yet.
+    expect(candidateBig3Sets(roster, lakers, 1)).toEqual([[]])
+    roster.push(makePlayer('l3'))
+    lakers.set('l3', 'LAL')
+    expect(candidateBig3Sets(roster, lakers, 1)[1]).toEqual([{ team: 'LAL', playerIds: ['melo', 'l1', 'l3'] }])
+  })
+
+  it('ignores X Players without a team and unlinked players', () => {
     const unlinked = [makePlayer('d1', { catalogPlayerId: null }), makePlayer('d2'), makePlayer('d3')]
     expect(candidateBig3Sets(unlinked, stars, 1)).toEqual([[]])
   })

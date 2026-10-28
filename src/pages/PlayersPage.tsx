@@ -23,6 +23,10 @@ export function PlayersPage() {
   const { players, loading, error, addPlayer, editPlayer, removePlayer } = usePlayers()
   const { catalog } = useCatalog()
   const stars = useMemo(() => big3Stars(catalog), [catalog])
+  const teams = useMemo(
+    () => [...new Set(catalog.flatMap((p) => (p.team ? [p.team] : [])))].sort(),
+    [catalog],
+  )
   const [mode, setMode] = useState<Mode>({ kind: 'closed' })
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null)
 
@@ -157,6 +161,7 @@ export function PlayersPage() {
             <PlayerForm
               key={mode.editing?.id ?? 'new'}
               initial={mode.editing}
+              teams={teams}
               onSubmit={handleXSubmit}
               onCancel={() => setMode({ kind: 'closed' })}
             />

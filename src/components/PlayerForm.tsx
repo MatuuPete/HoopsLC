@@ -16,12 +16,15 @@ const X_PLAYER_SALARY = 999
 
 interface PlayerFormProps {
   initial?: NewPlayer
+  /** Every team in the catalog, sorted; the X Player can join one's Team Big 3. */
+  teams: string[]
   onSubmit: (player: NewPlayer) => Promise<void>
   onCancel: () => void
 }
 
-export function PlayerForm({ initial, onSubmit, onCancel }: PlayerFormProps) {
+export function PlayerForm({ initial, teams, onSubmit, onCancel }: PlayerFormProps) {
   const [name, setName] = useState(initial?.name ?? '')
+  const [team, setTeam] = useState(initial?.team ?? '')
   const [tier, setTier] = useState<XTier>(initial?.xTier ?? 'standard')
   const [positions, setPositions] = useState<Position[]>(initial?.positions ?? ['PG'])
   const [offense, setOffense] = useState(initial?.offense ?? 0)
@@ -56,6 +59,7 @@ export function PlayerForm({ initial, onSubmit, onCancel }: PlayerFormProps) {
         offense,
         defense,
         catalogPlayerId: null,
+        team: team || null,
       })
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Failed to save player')
@@ -98,6 +102,26 @@ export function PlayerForm({ initial, onSubmit, onCancel }: PlayerFormProps) {
             autoFocus
             required
           />
+        </Field>
+
+        <Field
+          label="Team Big 3"
+          htmlFor="x-team"
+          hint={
+            team
+              ? `Forms a ${team} Big 3 with any two ${team} stars. All three get +25%.`
+              : 'Pick a team to let this X Player join its Big 3.'
+          }
+        >
+          <select id="x-team" className={inputClass} value={team} onChange={(e) => setTeam(e.target.value)}>
+            <option value="">No team</option>
+            {/* Keep a saved team selectable even if the catalog no longer lists it. */}
+            {[...new Set([...teams, ...(team ? [team] : [])])].sort().map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
         </Field>
 
         <Field

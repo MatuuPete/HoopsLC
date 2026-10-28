@@ -25,6 +25,11 @@ export interface Player {
   offense: number
   defense: number
   catalogPlayerId: string | null
+  /**
+   * X Players only: the team whose Team Big 3 they can join. Catalog
+   * players take their team from the catalog instead.
+   */
+  team?: string | null
 }
 
 export interface LineupSlot {

@@ -55,6 +55,19 @@ export function big3Stars(
   return stars
 }
 
+/**
+ * The team whose Big 3 `player` can join, if any: a catalog star's team from
+ * `stars`, or the team set on an X Player. An X Player with a team always
+ * counts, on top of that team's catalog stars.
+ */
+export function starTeam(
+  player: Pick<Player, 'isXPlayer' | 'catalogPlayerId' | 'team'>,
+  stars: Map<string, string>,
+): string | undefined {
+  if (player.isXPlayer) return player.team ?? undefined
+  return player.catalogPlayerId ? stars.get(player.catalogPlayerId) : undefined
+}
+
 /** The Big 3 bonus on a player's base (catalog) ratings, e.g. 249/119 → +62/+30. */
 export function big3Bonus(player: Pick<Player, 'offense' | 'defense'>): Big3Bonus {
   return {
@@ -96,7 +109,7 @@ export function candidateBig3Sets(
 ): Big3[][] {
   const byTeam = new Map<string, Player[]>()
   for (const player of players) {
-    const team = player.catalogPlayerId ? stars.get(player.catalogPlayerId) : undefined
+    const team = starTeam(player, stars)
     if (!team) continue
     const group = byTeam.get(team)
     if (group) group.push(player)

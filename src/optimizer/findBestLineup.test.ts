@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { findBestLineup } from './findBestLineup'
+import { starTeam } from './big3'
 import type { LineupPreferences, Player } from './types'
 
 const DEFAULT_PREFERENCES: LineupPreferences = {
@@ -927,6 +928,29 @@ describe('findBestLineup with Team Big 3', () => {
     expect(result.bench.map((p) => p.id)).toEqual(['gordon'])
   })
 
+  it('counts an X Player with a team toward a Big 3, bonus included', () => {
+    // Carmelo (X, DEN) + Jokic + Murray. Without Carmelo's team, the
+    // stronger non-star X Player and pg-other would start instead.
+    const players = [
+      makePlayer({ id: 'melo', positions: ['SF'], isXPlayer: true, xTier: 'standard', offense: 300, defense: 150, team: 'DEN' }),
+      makePlayer({ id: 'x-other', positions: ['SF'], isXPlayer: true, xTier: 'standard', offense: 310, defense: 150 }),
+      makePlayer({ id: 'jokic', positions: ['C'], catalogPlayerId: 'jokic', offense: 249, defense: 119 }),
+      makePlayer({ id: 'murray', positions: ['PG'], catalogPlayerId: 'murray', offense: 100, defense: 60 }),
+      makePlayer({ id: 'pg-other', positions: ['PG'], offense: 110, defense: 60 }),
+      makePlayer({ id: 'sg', positions: ['SG'] }),
+      makePlayer({ id: 'pf', positions: ['PF'] }),
+    ]
+    const stars = new Map([
+      ['jokic', 'DEN'],
+      ['murray', 'DEN'],
+    ])
+    const result = findBestLineup(players, 10000, { ...DEFAULT_PREFERENCES, big3: { maxCount: 1, stars } })
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.slots.map((s) => s.player.id)).toEqual(expect.arrayContaining(['melo', 'jokic', 'murray']))
+    expect(result.big3s).toEqual([{ team: 'DEN', playerIds: expect.arrayContaining(['melo', 'jokic', 'murray']) }])
+  })
+
   it('fields two Big 3s from different teams when allowed', () => {
     const players = [
       makePlayer({ id: 'd1', positions: ['PG'], catalogPlayerId: 'd1' }),
@@ -968,7 +992,7 @@ describe('findBestLineup with Team Big 3', () => {
     function bestBonus(starters: Player[], bench: Player[], stars: Map<string, string>, maxCount: number): [number, number] {
       const byTeam = new Map<string, Player[]>()
       for (const p of [...starters, ...bench]) {
-        const team = p.catalogPlayerId ? stars.get(p.catalogPlayerId) : undefined
+        const team = starTeam(p, stars)
         if (team) byTeam.set(team, [...(byTeam.get(team) ?? []), p])
       }
       const teamOptions = [...byTeam.values()].map((group) => {
@@ -1050,6 +1074,8 @@ describe('findBestLineup with Team Big 3', () => {
             positions: [...new Set([positions[rand(5)], positions[rand(5)]])],
             isXPlayer,
             catalogPlayerId: isXPlayer ? null : `c${i}`,
+            // Some X Players join a team's Big 3 too.
+            team: isXPlayer && rand(2) === 0 ? teams[rand(allStars ? 2 : 3)] : null,
             baseSalary: 50 + rand(200),
             offense: 10 + rand(90),
             defense: 10 + rand(90),

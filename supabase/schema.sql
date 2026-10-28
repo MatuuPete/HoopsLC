@@ -350,3 +350,9 @@ end;
 $$;
 
 revoke execute on function apply_catalog_import(jsonb) from anon;
+
+-- Team Big 3 for X Players: an X Player can be given a team and then joins
+-- that team's Big 3 alongside its catalog stars (and gets the +25% too).
+-- Catalog players take their team from player_catalog, so this is only set
+-- on X Players.
+alter table players add column if not exists team text;

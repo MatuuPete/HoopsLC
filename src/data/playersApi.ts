@@ -13,6 +13,7 @@ interface PlayerRow {
   offense: number
   defense: number
   catalog_player_id: string | null
+  team: string | null
 }
 
 function fromRow(row: PlayerRow): Player {
@@ -27,14 +28,18 @@ function fromRow(row: PlayerRow): Player {
     offense: row.offense,
     defense: row.defense,
     catalogPlayerId: row.catalog_player_id,
+    team: row.is_x_player ? (row.team ?? null) : null,
   }
 }
 
 export type NewPlayer = Omit<Player, 'id'>
 
-/** x_tier is only sent for X Players, so regular-player saves never depend on that column. */
+/**
+ * x_tier and team are only sent for X Players, so regular-player saves never
+ * depend on those columns. Catalog players take their team from the catalog.
+ */
 function xTierColumn(player: NewPlayer) {
-  return player.isXPlayer ? { x_tier: player.xTier ?? 'standard' } : {}
+  return player.isXPlayer ? { x_tier: player.xTier ?? 'standard', team: player.team ?? null } : {}
 }
 
 export async function listPlayers(): Promise<Player[]> {

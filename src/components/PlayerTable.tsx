@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { awardFor } from '../optimizer/awards'
+import { starTeam } from '../optimizer/big3'
 import type { Player, Position } from '../optimizer/types'
 import { power, sortPlayers, SORT_OPTIONS, type PlayerSort, type SortKey } from '../lib/playerSort'
 import { AwardBadge, TierBadge } from './LineupParts'
@@ -133,7 +134,7 @@ export function PlayerTable({ players, onEdit, onDelete, onSelect, selectedId, s
             {visible.map((p) => {
               const selected = p.id === selectedId
               const award = awardFor(p.name)
-              const starTeam = p.catalogPlayerId ? stars?.get(p.catalogPlayerId) : undefined
+              const team = stars ? starTeam(p, stars) : undefined
               return (
                 <tr
                   key={p.id}
@@ -164,7 +165,7 @@ export function PlayerTable({ players, onEdit, onDelete, onSelect, selectedId, s
                       )}
                       {p.xTier && <TierBadge tier={p.xTier} />}
                       {award && <AwardBadge award={award} />}
-                      {starTeam && <StarMark team={starTeam} />}
+                      {team && <StarMark team={team} />}
                     </span>
                   </td>
                   <td className="px-4 py-3 font-mono text-xs text-muted">{p.positions.join('/')}</td>
