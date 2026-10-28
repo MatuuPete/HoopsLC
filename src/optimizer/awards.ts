@@ -2,28 +2,32 @@ import type { Player } from './types'
 
 export interface Award {
   award: string
-  /** Badge label, e.g. "MVP". */
+  /** Badge label, e.g. "POTW". */
   short: string
   offense: number
   defense: number
 }
 
+/** The awards currently given out. */
+const AWARD_TYPES = {
+  playerOfTheWeek: { award: 'Player of the Week', short: 'POTW' },
+  rookieOfTheWeek: { award: 'Rookie of the Week', short: 'ROTW' },
+  playerOfTheMonth: { award: 'Player of the Month', short: 'POTM' },
+  rookieOfTheMonth: { award: 'Rookie of the Month', short: 'ROTM' },
+} as const
+
 /**
- * Season awards and the stat bonus each one grants. Bonuses stack on top of
- * a player's catalog offense/defense everywhere stats are totalled, and in
- * both lineup optimization modes. Keyed by lower-cased player name so catalog
- * and hand-entered players both match; update this table when the awards
- * change.
+ * Current award holders and the stat bonus each one grants. Bonuses stack on
+ * top of a player's catalog offense/defense everywhere stats are totalled, and
+ * in both lineup optimization modes. Keyed by lower-cased player name so
+ * catalog and hand-entered players both match; update this table when the
+ * awards change. Awards with no holder yet are simply left out.
  */
 const AWARDS: Record<string, Award> = {
-  'shai gilgeous-alexander': { award: 'MVP', short: 'MVP', offense: 10, defense: 5 },
-  'karl-anthony towns': { award: 'NBA Champion', short: 'CHAMP', offense: 5, defense: 5 },
-  'jalen brunson': { award: 'NBA Champion', short: 'CHAMP', offense: 10, defense: 5 },
-  'victor wembanyama': { award: 'Defensive Player of the Year', short: 'DPOY', offense: 0, defense: 10 },
-  'og anunoby': { award: 'NBA Champion', short: 'CHAMP', offense: 5, defense: 5 },
-  'keldon johnson': { award: 'Sixth Man of the Year', short: '6MOY', offense: 5, defense: 5 },
-  'cooper flagg': { award: 'Rookie of the Year', short: 'ROY', offense: 5, defense: 5 },
-  'nickeil alexander-walker': { award: 'Most Improved Player', short: 'MIP', offense: 5, defense: 5 },
+  'ty jerome': { ...AWARD_TYPES.playerOfTheWeek, offense: 5, defense: 0 },
+  // Rookie of the Week: not awarded yet
+  // Player of the Month: not awarded yet
+  // Rookie of the Month: not awarded yet
 }
 
 export function awardFor(name: string): Award | null {

@@ -36,8 +36,8 @@ describe('findBestLineup', () => {
       makePlayer({ id: 'pg-strong', positions: ['PG'], currentSalary: 200, offense: 150, defense: 50 }),
       makePlayer({ id: 'sg-x', positions: ['SG'], isXPlayer: true }),
       makePlayer({ id: 'sf-rich', positions: ['SF'], currentSalary: 900, offense: 100, defense: 100 }),
-      // 100 + 95 raw, plus the Rookie of the Year bonus (+5/+5) = 205.
-      makePlayer({ id: 'sf-roy', name: 'Cooper Flagg', positions: ['SF'], currentSalary: 200, offense: 100, defense: 95 }),
+      // 100 + 96 raw, plus the Player of the Week bonus (+5 OFF) = 201.
+      makePlayer({ id: 'sf-potw', name: 'Ty Jerome', positions: ['SF'], currentSalary: 200, offense: 100, defense: 96 }),
       makePlayer({ id: 'pf', positions: ['PF'] }),
       makePlayer({ id: 'c', positions: ['C'] }),
     ]
@@ -46,14 +46,14 @@ describe('findBestLineup', () => {
     if (!result.success) return
     const ids = result.slots.map((s) => s.player.id)
     expect(ids).toContain('pg-strong')
-    expect(ids).toContain('sf-roy')
+    expect(ids).toContain('sf-potw')
   })
 
   it('counts award bonuses toward stats-mode value', () => {
-    // Two PGs with identical raw stats and salary; only one has an award (MVP, +10 OFF / +5 DEF).
+    // Two PGs with identical raw stats and salary; only one has an award (Player of the Week, +5 OFF).
     const players: Player[] = [
       makePlayer({ id: 'a-plain', name: 'Plain Guard', positions: ['PG'] }),
-      makePlayer({ id: 'z-mvp', name: 'Shai Gilgeous-Alexander', positions: ['PG'] }),
+      makePlayer({ id: 'z-potw', name: 'Ty Jerome', positions: ['PG'] }),
       makePlayer({ id: 'sg', positions: ['SG'], isXPlayer: true }),
       makePlayer({ id: 'sf', positions: ['SF'] }),
       makePlayer({ id: 'pf', positions: ['PF'] }),
@@ -62,7 +62,7 @@ describe('findBestLineup', () => {
     const result = findBestLineup(players, 10000, { ...DEFAULT_PREFERENCES, objectiveMode: 'stats' })
     expect(result.success).toBe(true)
     if (!result.success) return
-    expect(result.slots.find((s) => s.position === 'PG')?.player.id).toBe('z-mvp')
+    expect(result.slots.find((s) => s.position === 'PG')?.player.id).toBe('z-potw')
   })
 
   it('requires exactly one X Player and picks the best position for it', () => {

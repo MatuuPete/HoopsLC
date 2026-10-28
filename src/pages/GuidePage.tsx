@@ -41,7 +41,7 @@ const STEPS: Step[] = [
           base salary.
         </p>
         <p>
-          Players who won a season award, such as MVP or Rookie of the Year, get a green award badge and
+          Players who won a current award, such as Player of the Week or Rookie of the Month, get a green award badge and
           a bonus to offense and/or defense. Hover the badge to see the bonus. It's added to their
           stats everywhere, including the lineup totals.
         </p>

@@ -20,8 +20,8 @@ function makePlayer(name: string, overrides: Partial<Player> = {}): Player {
 
 describe('awards', () => {
   it('looks up an award by player name, ignoring case and surrounding spaces', () => {
-    expect(awardFor('Shai Gilgeous-Alexander')).toMatchObject({ award: 'MVP', offense: 10, defense: 5 })
-    expect(awardFor('  shai gilgeous-alexander ')).toMatchObject({ award: 'MVP', offense: 10, defense: 5 })
+    expect(awardFor('Ty Jerome')).toMatchObject({ award: 'Player of the Week', offense: 5, defense: 0 })
+    expect(awardFor('  ty jerome ')).toMatchObject({ award: 'Player of the Week', offense: 5, defense: 0 })
   })
 
   it('returns null for players without an award', () => {
@@ -29,9 +29,9 @@ describe('awards', () => {
   })
 
   it('adds the award bonus to offense and defense', () => {
-    const wemby = makePlayer('Victor Wembanyama', { offense: 180, defense: 216 })
-    expect(effectiveOffense(wemby)).toBe(180)
-    expect(effectiveDefense(wemby)).toBe(226)
+    const jerome = makePlayer('Ty Jerome', { offense: 180, defense: 120 })
+    expect(effectiveOffense(jerome)).toBe(185)
+    expect(effectiveDefense(jerome)).toBe(120)
   })
 
   it('leaves players without an award unchanged', () => {
