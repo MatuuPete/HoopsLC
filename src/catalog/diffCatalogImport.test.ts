@@ -8,6 +8,7 @@ function makeCatalogPlayer(overrides: Partial<CatalogPlayer> & Pick<CatalogPlaye
     price: 100,
     offense: 50,
     defense: 50,
+    team: null,
     updatedAt: '2026-08-25T00:00:00Z',
     ...overrides,
   }
@@ -35,6 +36,18 @@ describe('diffCatalogImport', () => {
     const row = makeImportRow({ name: 'Victor Wembanyama', price: 2500 })
     const result = diffCatalogImport([row], [existing])
     expect(result).toEqual([{ row, status: 'changed', existing }])
+  })
+
+  it('marks a row as changed when its team differs', () => {
+    const existing = makeCatalogPlayer({ id: '1', name: 'Nikola Jokic', team: 'DEN' })
+    const row = makeImportRow({ name: 'Nikola Jokic', team: 'LAL' })
+    expect(diffCatalogImport([row], [existing])[0].status).toBe('changed')
+  })
+
+  it('ignores team when the row leaves it out', () => {
+    const existing = makeCatalogPlayer({ id: '1', name: 'Nikola Jokic', team: 'DEN' })
+    const row = makeImportRow({ name: 'Nikola Jokic' })
+    expect(diffCatalogImport([row], [existing])[0].status).toBe('unchanged')
   })
 
   it('marks a row as unchanged when all fields match, ignoring position order', () => {

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { usePlayers } from '../data/usePlayers'
 import { useCatalog } from '../data/useCatalog'
 import { PlayerForm } from '../components/PlayerForm'
@@ -7,6 +7,7 @@ import { CatalogPlayerSalaryForm } from '../components/CatalogPlayerSalaryForm'
 import { PlayerTable } from '../components/PlayerTable'
 import { RosterPanel } from '../components/RosterPanel'
 import type { Player } from '../optimizer/types'
+import { big3Stars } from '../optimizer/big3'
 import type { CatalogPlayer } from '../catalog/types'
 import type { NewPlayer } from '../data/playersApi'
 import { buttonPrimary, buttonSecondary } from '../components/ui'
@@ -21,6 +22,7 @@ type Mode =
 export function PlayersPage() {
   const { players, loading, error, addPlayer, editPlayer, removePlayer } = usePlayers()
   const { catalog } = useCatalog()
+  const stars = useMemo(() => big3Stars(catalog), [catalog])
   const [mode, setMode] = useState<Mode>({ kind: 'closed' })
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null)
 
@@ -173,6 +175,7 @@ export function PlayersPage() {
                 setSelectedPlayerId((current) => (current === player.id ? null : player.id))
               }
               selectedId={selectedPlayerId ?? undefined}
+              stars={stars}
             />
           )}
         </div>

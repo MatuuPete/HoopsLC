@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { awardFor, effectiveDefense, effectiveOffense } from '../optimizer/awards'
+import { big3BonusMap, type Big3, type Big3Tag } from '../optimizer/big3'
 import { POSITIONS, type LineupResult, type LineupSlot, type Player } from '../optimizer/types'
 import {
   BenchRow,
@@ -12,43 +13,34 @@ import {
   type SlotView,
 } from './LineupParts'
 
-function toSlotView(slot: LineupSlot): SlotView {
+/** Offense, defense and badges for one player, Big 3 bonus included. */
+function playerStats(player: Player, tag: Big3Tag | undefined) {
+  return {
+    offense: effectiveOffense(player) + (tag?.offense ?? 0),
+    defense: effectiveDefense(player) + (tag?.defense ?? 0),
+    award: awardFor(player.name),
+    big3: tag ? { team: tag.team, bonus: { offense: tag.offense, defense: tag.defense } } : null,
+  }
+}
+
+function toSlotView(slot: LineupSlot, tags: Map<string, Big3Tag>): SlotView {
   return {
     position: slot.position,
     name: slot.player.name,
     xTier: slot.player.xTier,
     salary: slot.player.baseSalary,
-    offense: effectiveOffense(slot.player),
-    defense: effectiveDefense(slot.player),
-    award: awardFor(slot.player.name),
+    ...playerStats(slot.player, tags.get(slot.player.id)),
   }
 }
 
-function toBenchView(player: Player): BenchView {
+function toBenchView(player: Player, tags: Map<string, Big3Tag>): BenchView {
   return {
     id: player.id,
     name: player.name,
     positions: player.positions,
     salary: player.baseSalary,
-    offense: effectiveOffense(player),
-    defense: effectiveDefense(player),
-    award: awardFor(player.name),
+    ...playerStats(player, tags.get(player.id)),
   }
-}
-
-function sumOffense(slots: LineupSlot[]): number {
-  return slots.reduce((sum, slot) => sum + effectiveOffense(slot.player), 0)
-}
-
-function sumDefense(slots: LineupSlot[]): number {
-  return slots.reduce((sum, slot) => sum + effectiveDefense(slot.player), 0)
-}
-
-function sumStatPower(slots: LineupSlot[]): number {
-  return slots.reduce(
-    (sum, slot) => sum + effectiveOffense(slot.player) + effectiveDefense(slot.player),
-    0,
-  )
 }
 
 function sumCurrentSalary(slots: LineupSlot[]): number {
@@ -102,26 +94,51 @@ function Notice({ title, children }: { title: string; children: ReactNode }) {
   )
 }
 
+/** The Team Big 3s a lineup fields, one line per team with its three players. */
+function Big3Strip({ big3s, players }: { big3s: Big3[]; players: Player[] }) {
+  return (
+    <ul aria-label="Team Big 3" className="flex flex-col gap-1.5 border-t border-border bg-star/[0.04] px-5 py-3">
+      {big3s.map((big3) => (
+        <li key={big3.team} className="flex min-w-0 items-baseline gap-2 text-xs">
+          <span className="shrink-0 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-star">
+            ★ Big 3 · {big3.team}
+          </span>
+          <span className="truncate text-text/85">
+            {big3.playerIds.map((id) => players.find((p) => p.id === id)?.name ?? id).join(', ')}
+          </span>
+          <span className="ml-auto shrink-0 font-mono text-[11px] text-muted">+25%</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 function LineupCard({
   title,
   slots,
   bench,
+  big3s = [],
   cap,
   action,
 }: {
   title: string
   slots: LineupSlot[]
   bench: Player[]
+  big3s?: Big3[]
   cap: number
   action?: ReactNode
 }) {
+  const fielded = [...slots.map((s) => s.player), ...bench]
+  const tags = big3BonusMap(big3s, fielded)
   const views = slots
-    .map(toSlotView)
+    .map((slot) => toSlotView(slot, tags))
     .sort((a, b) => POSITIONS.indexOf(a.position) - POSITIONS.indexOf(b.position))
   const benchViews = bench
-    .map(toBenchView)
+    .map((player) => toBenchView(player, tags))
     .sort((a, b) => b.offense + b.defense - (a.offense + a.defense))
   const hasBench = benchViews.length > 0
+  const totalOffense = views.reduce((sum, v) => sum + v.offense, 0)
+  const totalDefense = views.reduce((sum, v) => sum + v.defense, 0)
   return (
     <section className="rounded-xl border border-border bg-panel">
       <header className="flex items-center justify-between gap-3 px-5 pt-5">
@@ -139,6 +156,8 @@ function LineupCard({
       <div className="px-5 pt-4 pb-5">
         <CapStack slots={views} bench={benchViews} cap={cap} />
       </div>
+
+      {big3s.length > 0 && <Big3Strip big3s={big3s} players={fielded} />}
 
       <div className="border-t border-border px-5">
         {hasBench && <GroupHeader label="Starting five" />}
@@ -171,14 +190,14 @@ function LineupCard({
       )}
 
       <div className="grid grid-cols-2 gap-x-4 gap-y-5 border-t border-border px-5 py-5 sm:grid-cols-4">
-        <Stat label="Offense" value={sumOffense(slots)} />
-        <Stat label="Defense" value={sumDefense(slots)} />
+        <Stat label="Offense" value={totalOffense} />
+        <Stat label="Defense" value={totalDefense} />
         <Stat label="TPower · salary" value={sumCurrentSalary(slots)} />
-        <Stat label="TPower · stats" value={sumStatPower(slots)} />
+        <Stat label="TPower · stats" value={totalOffense + totalDefense} />
       </div>
       <p className="border-t border-border px-5 py-3 text-[11px] text-muted">
         {hasBench && 'Totals are for the starting five; bench salaries still count against the cap. '}
-        Offense and defense include award bonuses. TPower totals exclude kits. Salaries shown are
+        Offense and defense include award{big3s.length > 0 && ' and Big 3'} bonuses. TPower totals exclude kits. Salaries shown are
         what you own each player at.
       </p>
     </section>
@@ -318,6 +337,7 @@ export function LineupResultPanel({ result, players, cap, onSave }: LineupResult
       title="Best lineup"
       slots={result.slots}
       bench={result.bench}
+      big3s={result.big3s}
       cap={result.totalBaseSalary + result.remainingCap}
       action={onSave && <SaveLineupButton onSave={onSave} />}
     />

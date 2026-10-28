@@ -293,3 +293,60 @@ create policy "clips_owner" on clips
 -- Live sync: the clipboard page listens for inserts/deletes so a clip saved
 -- on the phone appears on an already-open laptop tab without a reload.
 alter publication supabase_realtime add table clips;
+
+-- Team Big 3: each catalog player gets a team. A team's stars are its five
+-- highest-priced catalog players; three stars of one team in a lineup
+-- (starters or bench) each get +25% of their base offense and defense.
+-- big3_count is how many Big 3s a lineup may count: 0 (off), 1 or 2.
+alter table player_catalog add column if not exists team text;
+alter table settings add column if not exists big3_count integer not null default 0
+  check (big3_count between 0 and 2);
+
+-- The catalog import now carries an optional "team". A row without one
+-- leaves the player's existing team alone.
+create or replace function apply_catalog_import(rows jsonb)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  import_row jsonb;
+  catalog_id uuid;
+begin
+  if not exists (select 1 from profiles where user_id = auth.uid() and is_admin) then
+    raise exception 'not authorized';
+  end if;
+
+  for import_row in select * from jsonb_array_elements(rows)
+  loop
+    insert into player_catalog (name, positions, price, offense, defense, team, updated_at)
+    values (
+      import_row->>'name',
+      (select array_agg(value::text) from jsonb_array_elements_text(import_row->'positions')),
+      (import_row->>'price')::numeric,
+      (import_row->>'offense')::numeric,
+      (import_row->>'defense')::numeric,
+      import_row->>'team',
+      now()
+    )
+    on conflict (lower(name)) do update
+      set positions = excluded.positions,
+          price = excluded.price,
+          offense = excluded.offense,
+          defense = excluded.defense,
+          team = coalesce(excluded.team, player_catalog.team),
+          updated_at = now()
+    returning id into catalog_id;
+
+    update players
+    set current_salary = (import_row->>'price')::numeric,
+        offense = (import_row->>'offense')::numeric,
+        defense = (import_row->>'defense')::numeric
+    where catalog_player_id = catalog_id
+      and not is_x_player;
+  end loop;
+end;
+$$;
+
+revoke execute on function apply_catalog_import(jsonb) from anon;

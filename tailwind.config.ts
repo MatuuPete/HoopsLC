@@ -11,6 +11,8 @@ export default {
         text: '#f5f5f5',
         muted: '#8a8a8a',
         accent: '#22c55e',
+        // Team Big 3 stars and badges.
+        star: '#facc15',
         // Light-theme palette for the public home page only — grounded in
         // actual basketball materials (backboard, court line, hardwood,
         // basketball leather) rather than the app's dark in-product theme.

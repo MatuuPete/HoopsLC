@@ -12,10 +12,21 @@ interface PlayerTableProps {
   onDelete: (id: string) => void
   onSelect?: (player: Player) => void
   selectedId?: string
+  /** catalogPlayerId → team for every Team Big 3 star (see big3Stars). */
+  stars?: Map<string, string>
 }
 
 const th = 'px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted'
 const numCell = 'px-4 py-3 text-right font-mono tabular-nums'
+
+/** Marks one of a team's five highest-priced players, who can form a Team Big 3. */
+function StarMark({ team }: { team: string }) {
+  return (
+    <span title={`${team} star: can form a Team Big 3`} className="shrink-0 text-xs leading-none text-star">
+      ★<span className="sr-only"> {team} star</span>
+    </span>
+  )
+}
 
 function SalaryChange({ player }: { player: Player }) {
   const delta = player.currentSalary - player.baseSalary
@@ -73,7 +84,7 @@ function AwardBonus({ bonus }: { bonus: number | undefined }) {
   return <span className="ml-2 text-[11px] text-accent">+{bonus}</span>
 }
 
-export function PlayerTable({ players, onEdit, onDelete, onSelect, selectedId }: PlayerTableProps) {
+export function PlayerTable({ players, onEdit, onDelete, onSelect, selectedId, stars }: PlayerTableProps) {
   const [search, setSearch] = useState('')
   const [position, setPosition] = useState<Position | 'ALL'>('ALL')
   const [sort, setSort] = usePlayerSort('roster')
@@ -122,6 +133,7 @@ export function PlayerTable({ players, onEdit, onDelete, onSelect, selectedId }:
             {visible.map((p) => {
               const selected = p.id === selectedId
               const award = awardFor(p.name)
+              const starTeam = p.catalogPlayerId ? stars?.get(p.catalogPlayerId) : undefined
               return (
                 <tr
                   key={p.id}
@@ -152,6 +164,7 @@ export function PlayerTable({ players, onEdit, onDelete, onSelect, selectedId }:
                       )}
                       {p.xTier && <TierBadge tier={p.xTier} />}
                       {award && <AwardBadge award={award} />}
+                      {starTeam && <StarMark team={starTeam} />}
                     </span>
                   </td>
                   <td className="px-4 py-3 font-mono text-xs text-muted">{p.positions.join('/')}</td>

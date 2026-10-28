@@ -21,6 +21,7 @@ export function diffCatalogImport(rows: CatalogImportRow[], existing: CatalogPla
       match.price === row.price &&
       match.offense === row.offense &&
       match.defense === row.defense &&
+      (row.team === undefined || match.team === row.team) &&
       samePositions(match.positions, row.positions)
     return { row, status: unchanged ? 'unchanged' : 'changed', existing: match }
   })

@@ -40,12 +40,17 @@ export function parseCatalogImport(raw: string): CatalogImportRow[] {
       }
     }
 
+    if (row.team !== undefined && (typeof row.team !== 'string' || row.team.trim() === '')) {
+      throw new Error(`Row ${index + 1}: "team" must be a non-empty string when given`)
+    }
+
     return {
       name: row.name.trim(),
       positions: row.positions as Position[],
       price: row.price as number,
       offense: row.offense as number,
       defense: row.defense as number,
+      ...(typeof row.team === 'string' ? { team: row.team.trim() } : {}),
     }
   })
 }

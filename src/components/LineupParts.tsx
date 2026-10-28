@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import type { Award } from '../optimizer/awards'
+import type { Big3Bonus } from '../optimizer/big3'
 import { X_TIERS, type Position, type XTier } from '../optimizer/types'
 
 /** Small uppercase label used for section and field headings across the builder. */
@@ -37,15 +38,38 @@ export function AwardBadge({ award }: { award: Award }) {
   )
 }
 
+/**
+ * Marks a player in a Team Big 3. `bonus` is absent on saved lineups, whose
+ * stats already include it.
+ */
+export interface Big3View {
+  team: string
+  bonus?: Big3Bonus
+}
+
+/** A Team Big 3 player; the tooltip names the team and the bonus. */
+export function Big3Badge({ big3 }: { big3: Big3View }) {
+  const bonus = big3.bonus ? `: +${big3.bonus.offense} OFF / +${big3.bonus.defense} DEF` : ''
+  return (
+    <span
+      title={`Team Big 3 (${big3.team})${bonus}`}
+      className="inline-flex h-4 shrink-0 items-center rounded-sm border border-star/50 px-1 font-mono text-[10px] font-semibold leading-none text-star"
+    >
+      B3
+    </span>
+  )
+}
+
 export interface SlotView {
   position: Position
   name: string
   xTier: XTier | null
   salary: number
-  /** Offense and defense include any award bonus. */
+  /** Offense and defense include any award and Big 3 bonus. */
   offense: number
   defense: number
   award: Award | null
+  big3: Big3View | null
 }
 
 /** One position in a lineup. `lg` is the result card, `sm` the saved-lineup cards. */
@@ -58,6 +82,7 @@ export function SlotRow({ slot, size = 'lg' }: { slot: SlotView; size?: 'lg' | '
           <span className="truncate text-text">{slot.name}</span>
           {slot.xTier && <TierBadge tier={slot.xTier} />}
           {slot.award && <AwardBadge award={slot.award} />}
+          {slot.big3 && <Big3Badge big3={slot.big3} />}
         </span>
         <span className="font-mono text-xs tabular-nums text-text">{slot.salary}</span>
       </li>
@@ -74,6 +99,7 @@ export function SlotRow({ slot, size = 'lg' }: { slot: SlotView; size?: 'lg' | '
           <span className="truncate text-[15px] font-medium text-text">{slot.name}</span>
           {slot.xTier && <TierBadge tier={slot.xTier} />}
           {slot.award && <AwardBadge award={slot.award} />}
+          {slot.big3 && <Big3Badge big3={slot.big3} />}
         </span>
         <span className="font-mono text-[11px] tabular-nums text-muted">
           OFF {slot.offense} <span className="text-border">/</span> DEF {slot.defense}
@@ -93,6 +119,7 @@ export interface BenchView {
   offense: number
   defense: number
   award: Award | null
+  big3: Big3View | null
 }
 
 /** One bench player. `lg` is the result card, `sm` the saved-lineup cards. */
@@ -108,6 +135,7 @@ export function BenchRow({ player, size = 'lg' }: { player: BenchView; size?: 'l
         <span className="flex min-w-0 items-center gap-1.5">
           <span className="truncate text-text/85">{player.name}</span>
           {player.award && <AwardBadge award={player.award} />}
+          {player.big3 && <Big3Badge big3={player.big3} />}
         </span>
         <span className="font-mono text-xs tabular-nums text-text/85">{player.salary}</span>
       </li>
@@ -121,6 +149,7 @@ export function BenchRow({ player, size = 'lg' }: { player: BenchView; size?: 'l
         <span className="flex min-w-0 items-center gap-2">
           <span className="truncate text-sm font-medium text-text/90">{player.name}</span>
           {player.award && <AwardBadge award={player.award} />}
+          {player.big3 && <Big3Badge big3={player.big3} />}
         </span>
         <span className="font-mono text-[11px] tabular-nums text-muted">
           OFF {player.offense} <span className="text-border">/</span> DEF {player.defense}

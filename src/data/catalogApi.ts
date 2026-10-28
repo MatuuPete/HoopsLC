@@ -9,6 +9,7 @@ interface CatalogRow {
   price: number
   offense: number
   defense: number
+  team: string | null
   updated_at: string
 }
 
@@ -20,6 +21,7 @@ function fromRow(row: CatalogRow): CatalogPlayer {
     price: row.price,
     offense: row.offense,
     defense: row.defense,
+    team: row.team,
     updatedAt: row.updated_at,
   }
 }

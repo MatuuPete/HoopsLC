@@ -4,8 +4,8 @@ import { parseCatalogImport } from '../catalog/parseCatalogImport'
 import { diffCatalogImport } from '../catalog/diffCatalogImport'
 import type { CatalogDiffEntry, CatalogImportRow } from '../catalog/types'
 
-function formatDiffField(oldValue: number | undefined, newValue: number): string {
-  if (oldValue === undefined || oldValue === newValue) return `${newValue}`
+function formatDiffField<T extends number | string>(oldValue: T | null | undefined, newValue: T): string {
+  if (oldValue === undefined || oldValue === null || oldValue === newValue) return `${newValue}`
   return `${oldValue}→${newValue}`
 }
 
@@ -79,6 +79,7 @@ export function AdminCatalogPage() {
                 {entry.row.name} {entry.status === 'new' && '(new)'}
               </span>
               <span className="text-muted text-xs">
+                {entry.row.team !== undefined && `${formatDiffField(entry.existing?.team, entry.row.team)} · `}
                 {formatDiffField(entry.existing?.price, entry.row.price)} (Off{' '}
                 {formatDiffField(entry.existing?.offense, entry.row.offense)}, Def{' '}
                 {formatDiffField(entry.existing?.defense, entry.row.defense)})

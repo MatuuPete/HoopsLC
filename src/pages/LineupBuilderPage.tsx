@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { usePlayers } from '../data/usePlayers'
 import { useSettings } from '../data/useSettings'
 import { useLineups } from '../data/useLineups'
+import { useCatalog } from '../data/useCatalog'
 import { findBestLineup } from '../optimizer/findBestLineup'
 import { lockedPlayerIds } from '../optimizer/lockedPlayerIds'
 import { awardFor, effectiveDefense, effectiveOffense, type Award } from '../optimizer/awards'
-import type { LineupResult } from '../optimizer/types'
+import { big3BonusMap, big3Stars, type Big3Tag } from '../optimizer/big3'
+import type { LineupResult, Player } from '../optimizer/types'
 import { LineupResultPanel, LineupResultPlaceholder } from '../components/LineupResultPanel'
 import { SavedLineupsPanel } from '../components/SavedLineupsPanel'
 import { LineupSettingsPanel } from '../components/LineupSettingsPanel'
@@ -14,6 +16,16 @@ import { LineupSettingsPanel } from '../components/LineupSettingsPanel'
 function awardField(name: string): { award?: Award } {
   const award = awardFor(name)
   return award ? { award } : {}
+}
+
+/** A saved player's stats with every bonus baked in, plus their award and Big 3 team. */
+function savedStats(player: Player, tag: Big3Tag | undefined) {
+  return {
+    offense: effectiveOffense(player) + (tag?.offense ?? 0),
+    defense: effectiveDefense(player) + (tag?.defense ?? 0),
+    ...awardField(player.name),
+    ...(tag ? { big3Team: tag.team } : {}),
+  }
 }
 
 export function LineupBuilderPage() {
@@ -36,10 +48,15 @@ export function LineupBuilderPage() {
     preferredBenchPlayerIds,
     legendEventEnabled,
     updateLegendEventEnabled,
+    big3Count,
+    updateBig3Count,
     updatePlayerRoles,
     error: settingsError,
   } = useSettings()
   const { lineups, error: lineupsError, saveLineup, renameLineup, removeLineup } = useLineups()
+  const { catalog } = useCatalog()
+  // Each team's stars come from the whole catalog, so they're the same for every user.
+  const stars = useMemo(() => big3Stars(catalog), [catalog])
   const [capInput, setCapInput] = useState(salaryCap)
   const [result, setResult] = useState<LineupResult | null>(null)
   // The cap the current result was calculated against, and a counter that
@@ -78,6 +95,7 @@ export function LineupBuilderPage() {
         benchSize: activeBenchSize,
         preferredBenchPlayerIds,
         extraLegendX: legendEventEnabled,
+        big3: { maxCount: big3Count, stars },
       }),
     )
   }
@@ -85,15 +103,14 @@ export function LineupBuilderPage() {
   async function handleSaveLineup() {
     if (!result || !result.success) return
     const nextCount = savedLineupCount + 1
+    const tags = big3BonusMap(result.big3s, [...result.slots.map((s) => s.player), ...result.bench])
     const bench = result.bench.map((player) => ({
       playerId: player.id,
       name: player.name,
       positions: player.positions,
       currentSalary: player.currentSalary,
       baseSalary: player.baseSalary,
-      offense: effectiveOffense(player),
-      defense: effectiveDefense(player),
-      ...awardField(player.name),
+      ...savedStats(player, tags.get(player.id)),
     }))
     await saveLineup(
       result.slots.map((slot) => ({
@@ -104,9 +121,7 @@ export function LineupBuilderPage() {
         ...(slot.player.xTier ? { xTier: slot.player.xTier } : {}),
         currentSalary: slot.player.currentSalary,
         baseSalary: slot.player.baseSalary,
-        offense: effectiveOffense(slot.player),
-        defense: effectiveDefense(slot.player),
-        ...awardField(slot.player.name),
+        ...savedStats(slot.player, tags.get(slot.player.id)),
       })),
       bench,
       `Lineup ${nextCount}`,
@@ -157,6 +172,9 @@ export function LineupBuilderPage() {
             onBenchSizeChange={updateBenchSize}
             legendEventEnabled={legendEventEnabled}
             onLegendEventChange={updateLegendEventEnabled}
+            big3Count={big3Count}
+            onBig3CountChange={updateBig3Count}
+            hasTeams={stars.size > 0}
             players={availablePlayers}
             roles={{ requiredPlayerIds, preferredBenchPlayerIds, unavailablePlayerIds }}
             onRolesChange={updatePlayerRoles}

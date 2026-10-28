@@ -15,13 +15,14 @@ interface Settings {
   benchSize: number
   preferredBenchPlayerIds: string[]
   legendEventEnabled: boolean
+  big3Count: number
 }
 
 export async function getSettings(): Promise<Settings> {
   const { data, error } = await supabase
     .from('settings')
     .select(
-      'salary_cap, required_player_ids, unavailable_player_ids, objective_mode, offense_weight, saved_lineup_count, bench_enabled, bench_size, preferred_bench_player_ids, legend_event_enabled',
+      'salary_cap, required_player_ids, unavailable_player_ids, objective_mode, offense_weight, saved_lineup_count, bench_enabled, bench_size, preferred_bench_player_ids, legend_event_enabled, big3_count',
     )
     .maybeSingle()
   if (error) throw error
@@ -36,6 +37,7 @@ export async function getSettings(): Promise<Settings> {
     benchSize: data?.bench_size ?? MAX_BENCH_SIZE,
     preferredBenchPlayerIds: data?.preferred_bench_player_ids ?? [],
     legendEventEnabled: data?.legend_event_enabled ?? false,
+    big3Count: data?.big3_count ?? 0,
   }
 }
 
@@ -75,6 +77,11 @@ export async function setLegendEventEnabled(userId: string, legendEventEnabled: 
   const { error } = await supabase
     .from('settings')
     .upsert({ user_id: userId, legend_event_enabled: legendEventEnabled })
+  if (error) throw error
+}
+
+export async function setBig3Count(userId: string, big3Count: number): Promise<void> {
+  const { error } = await supabase.from('settings').upsert({ user_id: userId, big3_count: big3Count })
   if (error) throw error
 }
 

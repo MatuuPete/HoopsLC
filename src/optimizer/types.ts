@@ -1,4 +1,5 @@
 import type { Award } from './awards'
+import type { Big3 } from './big3'
 
 export type Position = 'PG' | 'SG' | 'SF' | 'PF' | 'C'
 
@@ -55,6 +56,8 @@ export interface SavedLineupSlot {
   defense: number
   /** Absent when the player had no award, or on lineups saved before awards existed. */
   award?: Award
+  /** The team whose Big 3 the player was part of at save time; offense/defense include its bonus. */
+  big3Team?: string
 }
 
 /** Bench spots a lineup can have on top of the starting five. */
@@ -75,6 +78,7 @@ export interface SavedBenchPlayer {
   offense: number
   defense: number
   award?: Award
+  big3Team?: string
 }
 
 export type ObjectiveMode = 'power' | 'stats'
@@ -100,6 +104,13 @@ export interface LineupPreferences {
    * usual one, as long as one of the two is a Legend X. Absent means off.
    */
   extraLegendX?: boolean
+  /**
+   * Team Big 3: three of a team's stars in one lineup (starters or bench)
+   * each get +25% of their base ratings. `stars` maps catalogPlayerId to team
+   * (see big3Stars); `maxCount` is how many Big 3s may count (0-2). Absent
+   * means off.
+   */
+  big3?: { maxCount: number; stars: Map<string, string> }
 }
 
 export interface LineupSuccess {
@@ -107,6 +118,8 @@ export interface LineupSuccess {
   slots: LineupSlot[]
   /** Regular players only; empty when no bench was asked for. */
   bench: Player[]
+  /** The Big 3s this lineup counts; empty when it has none or the bonus is off. */
+  big3s: Big3[]
   /** Starters plus bench: everything that counts against the cap. */
   totalBaseSalary: number
   /** Starting five only. */

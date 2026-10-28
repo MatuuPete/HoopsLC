@@ -855,6 +855,239 @@ describe('findBestLineup with a bench, against brute force', () => {
   })
 })
 
+describe('findBestLineup with Team Big 3', () => {
+  // Three Denver stars and a non-star at each position they'd compete with.
+  function denverPool(): Player[] {
+    return [
+      makePlayer({ id: 'jokic', positions: ['C'], catalogPlayerId: 'jokic', offense: 249, defense: 119 }),
+      makePlayer({ id: 'murray', positions: ['PG'], catalogPlayerId: 'murray', offense: 100, defense: 60 }),
+      makePlayer({ id: 'gordon', positions: ['PF'], catalogPlayerId: 'gordon', offense: 80, defense: 80 }),
+      makePlayer({ id: 'pg-other', positions: ['PG'], offense: 110, defense: 60 }),
+      makePlayer({ id: 'pf-other', positions: ['PF'], offense: 90, defense: 80 }),
+      makePlayer({ id: 'sg', positions: ['SG'], isXPlayer: true }),
+      makePlayer({ id: 'sf', positions: ['SF'] }),
+    ]
+  }
+  const denverStars = new Map([
+    ['jokic', 'DEN'],
+    ['murray', 'DEN'],
+    ['gordon', 'DEN'],
+  ])
+
+  it('fields a Big 3 when its bonus beats stronger individual players', () => {
+    const result = findBestLineup(denverPool(), 10000, {
+      ...DEFAULT_PREFERENCES,
+      big3: { maxCount: 1, stars: denverStars },
+    })
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    const ids = result.slots.map((s) => s.player.id)
+    expect(ids).toEqual(expect.arrayContaining(['jokic', 'murray', 'gordon']))
+    expect(result.big3s).toEqual([{ team: 'DEN', playerIds: expect.arrayContaining(['jokic', 'murray', 'gordon']) }])
+  })
+
+  it('ignores Big 3s when the setting is off', () => {
+    const result = findBestLineup(denverPool(), 10000, {
+      ...DEFAULT_PREFERENCES,
+      big3: { maxCount: 0, stars: denverStars },
+    })
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.big3s).toEqual([])
+    expect(result.slots.map((s) => s.player.id)).toEqual(expect.arrayContaining(['pg-other', 'pf-other']))
+  })
+
+  it('skips a Big 3 the cap cannot afford', () => {
+    const players = denverPool().map((p) => (p.id === 'murray' ? { ...p, baseSalary: 5000 } : p))
+    const result = findBestLineup(players, 1000, {
+      ...DEFAULT_PREFERENCES,
+      big3: { maxCount: 1, stars: denverStars },
+    })
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.big3s).toEqual([])
+  })
+
+  it('counts bench players toward a Big 3', () => {
+    // Gordon can't start over pf-other even with his bonus (120 + 30 < 170),
+    // but on the bench he completes the trio and boosts Jokic and Murray.
+    const players = [
+      ...denverPool().map((p) => (p.id === 'gordon' ? { ...p, offense: 60, defense: 60 } : p)),
+      makePlayer({ id: 'bench-filler', positions: ['SF'], offense: 1, defense: 1 }),
+    ]
+    const result = findBestLineup(players, 10000, {
+      ...DEFAULT_PREFERENCES,
+      benchSize: 1,
+      big3: { maxCount: 1, stars: denverStars },
+    })
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.big3s).toHaveLength(1)
+    expect(result.slots.map((s) => s.player.id)).toEqual(expect.arrayContaining(['jokic', 'murray', 'pf-other']))
+    expect(result.bench.map((p) => p.id)).toEqual(['gordon'])
+  })
+
+  it('fields two Big 3s from different teams when allowed', () => {
+    const players = [
+      makePlayer({ id: 'd1', positions: ['PG'], catalogPlayerId: 'd1' }),
+      makePlayer({ id: 'd2', positions: ['SG'], catalogPlayerId: 'd2' }),
+      makePlayer({ id: 'd3', positions: ['SF'], catalogPlayerId: 'd3' }),
+      makePlayer({ id: 'b1', positions: ['PF'], catalogPlayerId: 'b1' }),
+      makePlayer({ id: 'b2', positions: ['C'], catalogPlayerId: 'b2' }),
+      makePlayer({ id: 'b3', positions: ['C'], catalogPlayerId: 'b3' }),
+      makePlayer({ id: 'x', positions: ['C'], isXPlayer: true }),
+      makePlayer({ id: 'filler', positions: ['SF'], currentSalary: 300 }),
+    ]
+    const stars = new Map([
+      ['d1', 'DEN'],
+      ['d2', 'DEN'],
+      ['d3', 'DEN'],
+      ['b1', 'BOS'],
+      ['b2', 'BOS'],
+      ['b3', 'BOS'],
+    ])
+    // The filler outranks d3 at SF, so d3, b2 and b3 all need bench spots.
+    const preferences = { ...DEFAULT_PREFERENCES, benchSize: 3 }
+
+    const two = findBestLineup(players, 10000, { ...preferences, big3: { maxCount: 2, stars } })
+    expect(two.success).toBe(true)
+    if (!two.success) return
+    expect(two.big3s.map((b) => b.team).sort()).toEqual(['BOS', 'DEN'])
+
+    const one = findBestLineup(players, 10000, { ...preferences, big3: { maxCount: 1, stars } })
+    expect(one.success).toBe(true)
+    if (!one.success) return
+    expect(one.big3s).toHaveLength(1)
+  })
+
+  describe('against brute force', () => {
+    const positions: Player['positions'][number][] = ['PG', 'SG', 'SF', 'PF', 'C']
+    const bonusPower = (p: Player) => Math.round(p.offense * 0.25) + Math.round(p.defense * 0.25)
+
+    /** Best [starter bonus, bench bonus] from at most `maxCount` same-team trios among the fielded stars. */
+    function bestBonus(starters: Player[], bench: Player[], stars: Map<string, string>, maxCount: number): [number, number] {
+      const byTeam = new Map<string, Player[]>()
+      for (const p of [...starters, ...bench]) {
+        const team = p.catalogPlayerId ? stars.get(p.catalogPlayerId) : undefined
+        if (team) byTeam.set(team, [...(byTeam.get(team) ?? []), p])
+      }
+      const teamOptions = [...byTeam.values()].map((group) => {
+        const options: [number, number][] = []
+        for (let a = 0; a < group.length; a++)
+          for (let b = a + 1; b < group.length; b++)
+            for (let c = b + 1; c < group.length; c++) {
+              const trio = [group[a], group[b], group[c]]
+              const s = trio.filter((p) => starters.includes(p)).reduce((sum, p) => sum + bonusPower(p), 0)
+              const n = trio.filter((p) => bench.includes(p)).reduce((sum, p) => sum + bonusPower(p), 0)
+              options.push([s, n])
+            }
+        return options
+      })
+      let best: [number, number] = [0, 0]
+      const better = (x: [number, number]) => x[0] > best[0] || (x[0] === best[0] && x[1] > best[1])
+      function pick(team: number, left: number, acc: [number, number]) {
+        if (better(acc)) best = acc
+        if (team === teamOptions.length || left === 0) return
+        pick(team + 1, left, acc)
+        for (const [s, n] of teamOptions[team]) pick(team + 1, left - 1, [acc[0] + s, acc[1] + n])
+      }
+      pick(0, maxCount, [0, 0])
+      return best
+    }
+
+    function bruteForce(players: Player[], cap: number, benchSize: number, stars: Map<string, string>, maxCount: number) {
+      const power = (p: Player) => p.offense + p.defense
+      let best: [number, number] | null = null
+      function pickStarters(slot: number, starters: Player[], cost: number) {
+        if (slot === positions.length) {
+          if (starters.filter((p) => p.isXPlayer).length !== 1) return
+          const rest = players.filter((p) => !starters.includes(p) && !p.isXPlayer)
+          pickBench(rest, 0, benchSize, cost, starters, [])
+          return
+        }
+        for (const p of players) {
+          if (starters.includes(p) || !p.positions.includes(positions[slot])) continue
+          pickStarters(slot + 1, [...starters, p], cost + p.baseSalary)
+        }
+      }
+      function pickBench(rest: Player[], from: number, left: number, cost: number, starters: Player[], bench: Player[]) {
+        if (left === 0) {
+          if (cost > cap) return
+          const [sb, bb] = bestBonus(starters, bench, stars, maxCount)
+          const total: [number, number] = [
+            starters.reduce((s, p) => s + power(p), 0) + sb,
+            bench.reduce((s, p) => s + power(p), 0) + bb,
+          ]
+          if (!best || total[0] > best[0] || (total[0] === best[0] && total[1] > best[1])) best = total
+          return
+        }
+        for (let i = from; i < rest.length; i++) {
+          pickBench(rest, i + 1, left - 1, cost + rest[i].baseSalary, starters, [...bench, rest[i]])
+        }
+      }
+      pickStarters(0, [], 0)
+      return best
+    }
+
+    it('matches brute force on random small pools with one or two Big 3s', () => {
+      let seed = 2024
+      const rand = (n: number) => {
+        seed = (seed * 16807) % 2147483647
+        return seed % n
+      }
+      const teams = ['DEN', 'BOS', 'LAL']
+      const big3Counts = [0, 0, 0]
+
+      for (let trial = 0; trial < 150; trial++) {
+        const stars = new Map<string, string>()
+        // Every third pool is all stars from two teams, so two Big 3s come up.
+        const allStars = trial % 3 === 0
+        const players: Player[] = Array.from({ length: 8 + rand(3) }, (_, i) => {
+          const isXPlayer = i < 2
+          if (!isXPlayer && (allStars || rand(3) > 0)) stars.set(`c${i}`, teams[rand(allStars ? 2 : 3)])
+          return makePlayer({
+            id: `p${i}`,
+            positions: [...new Set([positions[rand(5)], positions[rand(5)]])],
+            isXPlayer,
+            catalogPlayerId: isXPlayer ? null : `c${i}`,
+            baseSalary: 50 + rand(200),
+            offense: 10 + rand(90),
+            defense: 10 + rand(90),
+          })
+        })
+        // Two Big 3s need six stars fielded, so allow up to three bench spots.
+        const benchSize = rand(4)
+        const maxCount = 1 + rand(2)
+        const cap = 500 + rand(1200)
+
+        const expected = bruteForce(players, cap, benchSize, stars, maxCount)
+        const result = findBestLineup(players, cap, { ...DEFAULT_PREFERENCES, benchSize, big3: { maxCount, stars } })
+
+        if (!expected) {
+          expect(result.success, `trial ${trial}`).toBe(false)
+          continue
+        }
+        expect(result.success, `trial ${trial}`).toBe(true)
+        if (!result.success) continue
+        const starterIds = new Set(result.slots.map((s) => s.player.id))
+        const bonusIds = new Set(result.big3s.flatMap((b) => b.playerIds))
+        const total = (list: Player[], starter: boolean) =>
+          list
+            .filter((p) => starterIds.has(p.id) === starter)
+            .reduce((sum, p) => sum + p.offense + p.defense + (bonusIds.has(p.id) ? bonusPower(p) : 0), 0)
+        const fielded = [...result.slots.map((s) => s.player), ...result.bench]
+        expect(total(fielded, true), `trial ${trial} starters`).toBe(expected[0])
+        expect(total(fielded, false), `trial ${trial} bench`).toBe(expected[1])
+        expect(result.big3s.length, `trial ${trial} count`).toBeLessThanOrEqual(maxCount)
+        big3Counts[result.big3s.length]++
+      }
+      // The pools must actually exercise one and two Big 3s, not just lineups without any.
+      expect(big3Counts[1]).toBeGreaterThan(10)
+      expect(big3Counts[2]).toBeGreaterThan(0)
+    })
+  })
+})
+
 describe('findBestLineup X Player limit', () => {
   const legend = (id: string, positions: Player['positions'], power = 500) =>
     makePlayer({ id, positions, isXPlayer: true, xTier: 'legend', offense: power / 2, defense: power / 2 })

@@ -125,6 +125,7 @@ function SavedLineupCard({
               offense: slot.offense,
               defense: slot.defense,
               award: slot.award ?? null,
+              big3: slot.big3Team ? { team: slot.big3Team } : null,
             }}
           />
         ))}
@@ -170,6 +171,7 @@ function SavedLineupCard({
                     offense: player.offense,
                     defense: player.defense,
                     award: player.award ?? null,
+                    big3: player.big3Team ? { team: player.big3Team } : null,
                   }}
                 />
               ))}

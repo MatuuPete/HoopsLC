@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { MAX_BENCH_SIZE, type ObjectiveMode, type Player } from '../optimizer/types'
+import { MAX_BIG3_COUNT } from '../optimizer/big3'
 import type { PlayerRoleLists } from '../optimizer/playerRoles'
 import { Eyebrow, Switch, TierBadge } from './LineupParts'
 import { PlayerRolePicker } from './PlayerRolePicker'
@@ -18,6 +19,11 @@ export interface LineupSettingsPanelProps {
   onBenchSizeChange: (size: number) => void
   legendEventEnabled: boolean
   onLegendEventChange: (enabled: boolean) => void
+  /** How many Team Big 3s a lineup may count: 0 (off), 1 or 2. */
+  big3Count: number
+  onBig3CountChange: (count: number) => void
+  /** Whether any catalog player has a team yet; without teams there are no stars. */
+  hasTeams: boolean
   /** Owned players not locked into a saved lineup. */
   players: Player[]
   roles: PlayerRoleLists
@@ -44,6 +50,9 @@ export function LineupSettingsPanel({
   onBenchSizeChange,
   legendEventEnabled,
   onLegendEventChange,
+  big3Count,
+  onBig3CountChange,
+  hasTeams,
   players,
   roles,
   onRolesChange,
@@ -82,7 +91,7 @@ export function LineupSettingsPanel({
         <div className="-mt-2 flex flex-col gap-2">
           <p className="text-xs leading-relaxed text-muted">
             {objectiveMode === 'power'
-              ? 'Highest total power: offense plus defense, award bonuses included.'
+              ? 'Highest total power: offense plus defense, award and Big 3 bonuses included.'
               : 'Best offense and defense, weighted by the slider.'}
           </p>
           {objectiveMode === 'stats' && (
@@ -135,6 +144,8 @@ export function LineupSettingsPanel({
         </div>
 
         <LegendEventCard enabled={legendEventEnabled} onChange={onLegendEventChange} />
+
+        <Big3Card count={big3Count} onChange={onBig3CountChange} hasTeams={hasTeams} />
       </div>
 
       <div className="flex flex-col gap-3 border-t border-border p-5">
@@ -228,6 +239,62 @@ function LegendEventCard({ enabled, onChange }: { enabled: boolean; onChange: (e
           )}
         </XSlot>
       </ul>
+    </div>
+  )
+}
+
+const BIG3_CAPTIONS = [
+  'Off: no Big 3 bonus',
+  'Three stars of one team: +25% each',
+  'Up to two teams, three stars each: +25%',
+]
+
+/**
+ * The Team Big 3 setting: off, or how many Big 3s a lineup may count. A
+ * team's stars are its five highest-priced catalog players.
+ */
+function Big3Card({
+  count,
+  onChange,
+  hasTeams,
+}: {
+  count: number
+  onChange: (count: number) => void
+  hasTeams: boolean
+}) {
+  const on = count > 0
+  return (
+    <div
+      className={`flex flex-col gap-3 rounded-lg border p-3 transition-colors ${
+        on ? 'border-star/35 bg-star/[0.04]' : 'border-border bg-bg/60'
+      }`}
+    >
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <span id="big3-label" className="flex items-center gap-1.5 text-sm font-medium text-text">
+          Team Big 3
+          <span aria-hidden className={on ? 'text-star' : 'text-muted'}>
+            ★
+          </span>
+        </span>
+        <span className="text-xs text-muted">{BIG3_CAPTIONS[count] ?? BIG3_CAPTIONS[0]}</span>
+      </div>
+      <div
+        role="radiogroup"
+        aria-labelledby="big3-label"
+        className="grid grid-cols-3 gap-1 rounded-md border border-border bg-bg p-1"
+      >
+        {Array.from({ length: MAX_BIG3_COUNT + 1 }, (_, i) => i).map((option) => (
+          <SegmentButton key={option} active={count === option} onClick={() => onChange(option)}>
+            {option === 0 ? 'Off' : <span className="font-mono tabular-nums">{option}</span>}
+          </SegmentButton>
+        ))}
+      </div>
+      {on && !hasTeams && (
+        <p className="text-[11px] leading-relaxed text-muted">
+          No teams in the catalog yet. Add a <span className="font-mono text-text/80">team</span> to each
+          player in the catalog import to find each team's stars.
+        </p>
+      )}
     </div>
   )
 }

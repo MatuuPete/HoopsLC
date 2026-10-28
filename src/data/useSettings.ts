@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   getSettings,
   setBenchEnabled,
+  setBig3Count,
   setBenchSize,
   setLegendEventEnabled,
   setObjectiveMode,
@@ -26,6 +27,7 @@ export function useSettings() {
   const [benchSize, setBenchSizeState] = useState(MAX_BENCH_SIZE)
   const [preferredBenchPlayerIds, setPreferredBenchPlayerIdsState] = useState<string[]>([])
   const [legendEventEnabled, setLegendEventEnabledState] = useState(false)
+  const [big3Count, setBig3CountState] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const roleSaves = useRef<Promise<void>>(Promise.resolve())
@@ -46,6 +48,7 @@ export function useSettings() {
       setBenchSizeState(settings.benchSize)
       setPreferredBenchPlayerIdsState(settings.preferredBenchPlayerIds)
       setLegendEventEnabledState(settings.legendEventEnabled)
+      setBig3CountState(settings.big3Count)
       setError(null)
     } catch (err) {
       setError(`Couldn't load your settings: ${errorMessage(err)}`)
@@ -104,6 +107,11 @@ export function useSettings() {
     if (await save(() => setLegendEventEnabled(session.user.id, value))) setLegendEventEnabledState(value)
   }
 
+  async function updateBig3Count(value: number) {
+    if (!session) return
+    if (await save(() => setBig3Count(session.user.id, value))) setBig3CountState(value)
+  }
+
   // Role buttons get clicked in quick succession, so the lists update on
   // screen right away (the next click builds on them) and saves are queued
   // so they reach the server in click order.
@@ -128,6 +136,7 @@ export function useSettings() {
     benchSize,
     preferredBenchPlayerIds,
     legendEventEnabled,
+    big3Count,
     loading,
     error,
     updateSalaryCap,
@@ -137,6 +146,7 @@ export function useSettings() {
     updateBenchEnabled,
     updateBenchSize,
     updateLegendEventEnabled,
+    updateBig3Count,
     updatePlayerRoles,
   }
 }

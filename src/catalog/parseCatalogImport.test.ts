@@ -11,6 +11,16 @@ describe('parseCatalogImport', () => {
     ])
   })
 
+  it('keeps a trimmed team when one is given', () => {
+    const raw = JSON.stringify([{ name: 'Nikola Jokic', positions: ['C'], price: 2400, offense: 249, defense: 119, team: ' DEN ' }])
+    expect(parseCatalogImport(raw)[0].team).toBe('DEN')
+  })
+
+  it('throws when team is given but empty', () => {
+    const raw = JSON.stringify([{ name: 'Test', positions: ['PG'], price: 100, offense: 50, defense: 50, team: ' ' }])
+    expect(() => parseCatalogImport(raw)).toThrow('Row 1: "team" must be a non-empty string when given')
+  })
+
   it('throws on invalid JSON', () => {
     expect(() => parseCatalogImport('not json')).toThrow('Invalid JSON')
   })
