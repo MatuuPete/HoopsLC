@@ -37,6 +37,7 @@ export function LineupBuilderPage() {
     legendEventEnabled,
     updateLegendEventEnabled,
     updatePlayerRoles,
+    error: settingsError,
   } = useSettings()
   const { lineups, error: lineupsError, saveLineup, renameLineup, removeLineup } = useLineups()
   const [capInput, setCapInput] = useState(salaryCap)
@@ -138,6 +139,8 @@ export function LineupBuilderPage() {
           <HeaderStat label="Saved lineups" value={lineups.length} />
         </dl>
       </header>
+
+      {settingsError && <p className="mt-4 text-sm text-red-400">{settingsError}</p>}
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:mt-8 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] lg:gap-8">
         <div className="lg:col-start-1 lg:row-start-1">

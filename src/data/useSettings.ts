@@ -27,23 +27,43 @@ export function useSettings() {
   const [preferredBenchPlayerIds, setPreferredBenchPlayerIdsState] = useState<string[]>([])
   const [legendEventEnabled, setLegendEventEnabledState] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const roleSaves = useRef<Promise<void>>(Promise.resolve())
 
+  // A failed load would otherwise leave every setting on its default with no
+  // sign anything went wrong, so the error is kept for the page to show.
   const refresh = useCallback(async () => {
     setLoading(true)
-    const settings = await getSettings()
-    setSalaryCapState(settings.salaryCap)
-    setRequiredPlayerIdsState(settings.requiredPlayerIds)
-    setUnavailablePlayerIdsState(settings.unavailablePlayerIds)
-    setObjectiveModeState(settings.objectiveMode)
-    setOffenseWeightState(settings.offenseWeight)
-    setSavedLineupCountState(settings.savedLineupCount)
-    setBenchEnabledState(settings.benchEnabled)
-    setBenchSizeState(settings.benchSize)
-    setPreferredBenchPlayerIdsState(settings.preferredBenchPlayerIds)
-    setLegendEventEnabledState(settings.legendEventEnabled)
-    setLoading(false)
+    try {
+      const settings = await getSettings()
+      setSalaryCapState(settings.salaryCap)
+      setRequiredPlayerIdsState(settings.requiredPlayerIds)
+      setUnavailablePlayerIdsState(settings.unavailablePlayerIds)
+      setObjectiveModeState(settings.objectiveMode)
+      setOffenseWeightState(settings.offenseWeight)
+      setSavedLineupCountState(settings.savedLineupCount)
+      setBenchEnabledState(settings.benchEnabled)
+      setBenchSizeState(settings.benchSize)
+      setPreferredBenchPlayerIdsState(settings.preferredBenchPlayerIds)
+      setLegendEventEnabledState(settings.legendEventEnabled)
+      setError(null)
+    } catch (err) {
+      setError(`Couldn't load your settings: ${errorMessage(err)}`)
+    } finally {
+      setLoading(false)
+    }
   }, [])
+
+  /** Runs a settings save, recording a failure instead of letting it vanish. */
+  async function save(write: () => Promise<void>) {
+    try {
+      await write()
+      return true
+    } catch (err) {
+      setError(`Couldn't save your settings: ${errorMessage(err)}`)
+      return false
+    }
+  }
 
   useEffect(() => {
     if (session) refresh()
@@ -51,44 +71,37 @@ export function useSettings() {
 
   async function updateSalaryCap(value: number) {
     if (!session) return
-    await setSalaryCap(session.user.id, value)
-    setSalaryCapState(value)
+    if (await save(() => setSalaryCap(session.user.id, value))) setSalaryCapState(value)
   }
 
   async function updateObjectiveMode(value: ObjectiveMode) {
     if (!session) return
-    await setObjectiveMode(session.user.id, value)
-    setObjectiveModeState(value)
+    if (await save(() => setObjectiveMode(session.user.id, value))) setObjectiveModeState(value)
   }
 
   async function updateOffenseWeight(value: number) {
     if (!session) return
-    await setOffenseWeight(session.user.id, value)
-    setOffenseWeightState(value)
+    if (await save(() => setOffenseWeight(session.user.id, value))) setOffenseWeightState(value)
   }
 
   async function updateSavedLineupCount(value: number) {
     if (!session) return
-    await setSavedLineupCount(session.user.id, value)
-    setSavedLineupCountState(value)
+    if (await save(() => setSavedLineupCount(session.user.id, value))) setSavedLineupCountState(value)
   }
 
   async function updateBenchEnabled(value: boolean) {
     if (!session) return
-    await setBenchEnabled(session.user.id, value)
-    setBenchEnabledState(value)
+    if (await save(() => setBenchEnabled(session.user.id, value))) setBenchEnabledState(value)
   }
 
   async function updateBenchSize(value: number) {
     if (!session) return
-    await setBenchSize(session.user.id, value)
-    setBenchSizeState(value)
+    if (await save(() => setBenchSize(session.user.id, value))) setBenchSizeState(value)
   }
 
   async function updateLegendEventEnabled(value: boolean) {
     if (!session) return
-    await setLegendEventEnabled(session.user.id, value)
-    setLegendEventEnabledState(value)
+    if (await save(() => setLegendEventEnabled(session.user.id, value))) setLegendEventEnabledState(value)
   }
 
   // Role buttons get clicked in quick succession, so the lists update on
@@ -100,7 +113,7 @@ export function useSettings() {
     setPreferredBenchPlayerIdsState(lists.preferredBenchPlayerIds)
     setUnavailablePlayerIdsState(lists.unavailablePlayerIds)
     const userId = session.user.id
-    roleSaves.current = roleSaves.current.catch(() => {}).then(() => setPlayerRoles(userId, lists))
+    roleSaves.current = roleSaves.current.then(() => save(() => setPlayerRoles(userId, lists))).then(() => {})
     return roleSaves.current
   }
 
@@ -116,6 +129,7 @@ export function useSettings() {
     preferredBenchPlayerIds,
     legendEventEnabled,
     loading,
+    error,
     updateSalaryCap,
     updateObjectiveMode,
     updateOffenseWeight,
@@ -125,4 +139,10 @@ export function useSettings() {
     updateLegendEventEnabled,
     updatePlayerRoles,
   }
+}
+
+function errorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message
+  if (err && typeof err === 'object' && 'message' in err) return String(err.message)
+  return 'unknown error'
 }
