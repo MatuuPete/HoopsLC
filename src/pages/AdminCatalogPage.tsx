@@ -22,7 +22,7 @@ export function AdminCatalogPage() {
     setDiff(null)
     setImportError(null)
     try {
-      const rows = parseCatalogImport(raw)
+      const rows = parseCatalogImport(raw, catalog)
       setDiff(diffCatalogImport(rows, catalog))
     } catch (err) {
       setParseError(err instanceof Error ? err.message : 'Failed to parse batch')

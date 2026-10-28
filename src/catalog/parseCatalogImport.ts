@@ -1,11 +1,18 @@
 import { POSITIONS, type Position } from '../optimizer/types'
-import type { CatalogImportRow } from './types'
+import type { CatalogImportRow, CatalogPlayer } from './types'
+
+const STAT_FIELDS = ['positions', 'price', 'offense', 'defense'] as const
 
 function isPosition(value: unknown): value is Position {
   return typeof value === 'string' && (POSITIONS as string[]).includes(value)
 }
 
-export function parseCatalogImport(raw: string): CatalogImportRow[] {
+/**
+ * Parses a catalog batch. A row with only "name" and "team" sets just that
+ * player's team: its positions, price and stats are copied from `existing`,
+ * so stale numbers never ride along with a team update.
+ */
+export function parseCatalogImport(raw: string, existing: CatalogPlayer[] = []): CatalogImportRow[] {
   let parsed: unknown
   try {
     parsed = JSON.parse(raw)
@@ -22,6 +29,19 @@ export function parseCatalogImport(raw: string): CatalogImportRow[] {
       throw new Error(`Row ${index + 1}: expected an object`)
     }
     const row = entry as Record<string, unknown>
+
+    if (typeof row.name === 'string' && typeof row.team === 'string' && STAT_FIELDS.every((f) => !(f in row))) {
+      const name = row.name.trim().toLowerCase()
+      const match = existing.find((p) => p.name.trim().toLowerCase() === name)
+      if (!match) {
+        throw new Error(
+          `Row ${index + 1}: "${row.name}" isn't in the catalog yet, so it needs positions, price, offense and defense`,
+        )
+      }
+      if (row.team.trim() === '') throw new Error(`Row ${index + 1}: "team" must be a non-empty string when given`)
+      const { name: matchName, positions, price, offense, defense } = match
+      return { name: matchName, positions, price, offense, defense, team: row.team.trim() }
+    }
 
     if (typeof row.name !== 'string' || row.name.trim() === '') {
       throw new Error(`Row ${index + 1}: "name" must be a non-empty string`)

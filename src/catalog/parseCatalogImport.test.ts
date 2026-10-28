@@ -21,6 +21,21 @@ describe('parseCatalogImport', () => {
     expect(() => parseCatalogImport(raw)).toThrow('Row 1: "team" must be a non-empty string when given')
   })
 
+  it('fills a team-only row from the existing catalog player', () => {
+    const existing = [
+      { id: '1', name: 'Nikola Jokic', positions: ['C' as const], price: 2400, offense: 249, defense: 119, team: null, updatedAt: '' },
+    ]
+    const raw = JSON.stringify([{ name: 'nikola jokic', team: 'DEN' }])
+    expect(parseCatalogImport(raw, existing)).toEqual([
+      { name: 'Nikola Jokic', positions: ['C'], price: 2400, offense: 249, defense: 119, team: 'DEN' },
+    ])
+  })
+
+  it('throws on a team-only row for a player not in the catalog', () => {
+    const raw = JSON.stringify([{ name: 'Nobody', team: 'DEN' }])
+    expect(() => parseCatalogImport(raw, [])).toThrow(`Row 1: "Nobody" isn't in the catalog yet`)
+  })
+
   it('throws on invalid JSON', () => {
     expect(() => parseCatalogImport('not json')).toThrow('Invalid JSON')
   })
