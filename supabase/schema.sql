@@ -356,3 +356,104 @@ revoke execute on function apply_catalog_import(jsonb) from anon;
 -- Catalog players take their team from player_catalog, so this is only set
 -- on X Players.
 alter table players add column if not exists team text;
+
+-- X Pool: the game's shared list of X Players (name, team, positions, tier,
+-- stats), like player_catalog is for regular players. Users add X Players
+-- by picking from it; owned X Players linked by x_pool_id follow every pool
+-- update, which is also how they get their Team Big 3 team. Custom X
+-- Players (x_pool_id null) keep their own values.
+create table if not exists x_pool (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  team text not null,
+  positions text[] not null,
+  x_tier text not null default 'standard',
+  offense numeric not null,
+  defense numeric not null,
+  updated_at timestamptz not null default now(),
+  constraint x_pool_positions_valid check (
+    coalesce(array_length(positions, 1), 0) > 0
+    and positions <@ array['PG','SG','SF','PF','C']
+  ),
+  constraint x_pool_stats check (
+    (x_tier = 'standard' and offense + defense = 450)
+    or (x_tier = 'legend' and offense + defense = 500)
+  )
+);
+
+create unique index if not exists x_pool_name_key on x_pool (lower(name));
+
+alter table x_pool enable row level security;
+
+drop policy if exists "x_pool_read" on x_pool;
+create policy "x_pool_read" on x_pool
+  for select using (auth.uid() is not null);
+
+alter table players add column if not exists x_pool_id uuid references x_pool(id) on delete set null;
+alter table players drop constraint if exists x_pool_link_only_x;
+alter table players add constraint x_pool_link_only_x check (is_x_player or x_pool_id is null);
+
+-- Bulk X Pool import (admins only, like apply_catalog_import). Upserts each
+-- row, links any unlinked X Player with the same name (ignoring case and
+-- apostrophe style) across all users, then copies the pool values onto
+-- every linked X Player.
+create or replace function apply_x_pool_import(rows jsonb)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  import_row jsonb;
+  pool_id uuid;
+  pool_name text;
+begin
+  if not exists (select 1 from profiles where user_id = auth.uid() and is_admin) then
+    raise exception 'not authorized';
+  end if;
+
+  for import_row in select * from jsonb_array_elements(rows)
+  loop
+    pool_name := trim(import_row->>'name');
+
+    insert into x_pool (name, team, positions, x_tier, offense, defense, updated_at)
+    values (
+      pool_name,
+      import_row->>'team',
+      (select array_agg(value::text) from jsonb_array_elements_text(import_row->'positions')),
+      coalesce(import_row->>'tier', 'standard'),
+      (import_row->>'offense')::numeric,
+      (import_row->>'defense')::numeric,
+      now()
+    )
+    on conflict (lower(name)) do update
+      set name = excluded.name,
+          team = excluded.team,
+          positions = excluded.positions,
+          x_tier = excluded.x_tier,
+          offense = excluded.offense,
+          defense = excluded.defense,
+          updated_at = now()
+    returning id into pool_id;
+
+    update players
+    set x_pool_id = pool_id
+    where is_x_player
+      and x_pool_id is null
+      and lower(replace(trim(name), '’', '''')) = lower(replace(pool_name, '’', ''''));
+
+    update players p
+    set name = x.name,
+        team = x.team,
+        positions = x.positions,
+        x_tier = x.x_tier,
+        offense = x.offense,
+        defense = x.defense
+    from x_pool x
+    where x.id = pool_id
+      and p.x_pool_id = pool_id;
+  end loop;
+end;
+$$;
+
+revoke execute on function apply_x_pool_import(jsonb) from anon;

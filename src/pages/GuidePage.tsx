@@ -54,7 +54,13 @@ const STEPS: Step[] = [
     body: (
       <>
         <p>
-          X Players aren't in the catalog, so you enter them by hand with <Ui>Add X Player</Ui>.
+          Click <Ui>Add X Player</Ui> to open the X Pool, the game's own X Players. Filter by{' '}
+          <Ui>All</Ui>, <Ui>East</Ui> or <Ui>West</Ui>, or search, and click a player to add them. Their
+          team, positions and stats come from the pool and stay up to date on their own, and their team
+          lets them join that team's Big 3. X Players always cost 999 salary.
+        </p>
+        <p>
+          Not in the pool? Choose <Ui>Add a custom X Player</Ui> at the bottom and enter them by hand:
         </p>
         <ol>
           <li>
@@ -62,14 +68,14 @@ const STEPS: Step[] = [
             add up to exactly 450, or <TierBadge tier="legend" /> <Ui>Legend X</Ui>, where they add up to
             exactly 500.
           </li>
-          <li>Enter the name, positions, offense and defense. The form shows when the total is right.</li>
+          <li>Enter the name, team, positions, offense and defense. The form shows when the total is right.</li>
           <li>
-            Click <Ui>Add X Player</Ui>. X Players always cost 999 salary.
+            Click <Ui>Add X Player</Ui>.
           </li>
         </ol>
         <p>
-          To fix a mistake later, use the pencil icon on the player's row, or click the row and choose{' '}
-          <Ui>Edit player</Ui>.
+          Custom X Players can be fixed later with the pencil icon on their row, or by clicking the row
+          and choosing <Ui>Edit player</Ui>.
         </p>
       </>
     ),

@@ -12,7 +12,7 @@ import {
 } from './ui'
 
 const TIERS = Object.keys(X_TIERS) as XTier[]
-const X_PLAYER_SALARY = 999
+export const X_PLAYER_SALARY = 999
 
 interface PlayerFormProps {
   initial?: NewPlayer

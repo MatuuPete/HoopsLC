@@ -1,6 +1,9 @@
 import { useMemo, useState } from 'react'
 import { usePlayers } from '../data/usePlayers'
 import { useCatalog } from '../data/useCatalog'
+import { useXPool } from '../data/useXPool'
+import { XPoolPicker } from '../components/XPoolPicker'
+import type { XPoolPlayer } from '../catalog/xPool'
 import { PlayerForm } from '../components/PlayerForm'
 import { CatalogPlayerPicker } from '../components/CatalogPlayerPicker'
 import { CatalogPlayerSalaryForm } from '../components/CatalogPlayerSalaryForm'
@@ -11,17 +14,24 @@ import { big3Stars } from '../optimizer/big3'
 import type { CatalogPlayer } from '../catalog/types'
 import type { NewPlayer } from '../data/playersApi'
 import { buttonPrimary, buttonSecondary } from '../components/ui'
+import { X_PLAYER_SALARY } from '../components/PlayerForm'
 
 type Mode =
   | { kind: 'closed' }
   | { kind: 'pick-catalog' }
   | { kind: 'add-catalog'; player: CatalogPlayer }
   | { kind: 'edit-catalog'; player: Player }
+  | { kind: 'pick-x' }
   | { kind: 'x-form'; editing?: Player }
 
 export function PlayersPage() {
   const { players, loading, error, addPlayer, editPlayer, removePlayer } = usePlayers()
   const { catalog } = useCatalog()
+  const { pool } = useXPool()
+  const ownedPoolIds = useMemo(
+    () => new Set(players.flatMap((p) => (p.xPoolId ? [p.xPoolId] : []))),
+    [players],
+  )
   const stars = useMemo(() => big3Stars(catalog), [catalog])
   const teams = useMemo(
     () => [...new Set(catalog.flatMap((p) => (p.team ? [p.team] : [])))].sort(),
@@ -45,6 +55,23 @@ export function PlayersPage() {
     } else {
       await addPlayer(player)
     }
+    setMode({ kind: 'closed' })
+  }
+
+  async function handleAddFromPool(entry: XPoolPlayer) {
+    await addPlayer({
+      name: entry.name,
+      positions: entry.positions,
+      isXPlayer: true,
+      xTier: entry.tier,
+      baseSalary: X_PLAYER_SALARY,
+      currentSalary: X_PLAYER_SALARY,
+      offense: entry.offense,
+      defense: entry.defense,
+      catalogPlayerId: null,
+      team: entry.team,
+      xPoolId: entry.id,
+    })
     setMode({ kind: 'closed' })
   }
 
@@ -100,7 +127,7 @@ export function PlayersPage() {
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => setMode({ kind: 'x-form' })}
+            onClick={() => setMode({ kind: 'pick-x' })}
             className={buttonSecondary}
           >
             Add X Player
@@ -153,6 +180,16 @@ export function PlayersPage() {
               defense={mode.player.defense}
               initialBaseSalary={mode.player.baseSalary}
               onSubmit={(baseSalary, positions) => handleEditCatalogSubmit(mode.player, baseSalary, positions)}
+              onCancel={() => setMode({ kind: 'closed' })}
+            />
+          )}
+
+          {mode.kind === 'pick-x' && (
+            <XPoolPicker
+              pool={pool}
+              ownedPoolIds={ownedPoolIds}
+              onSelect={handleAddFromPool}
+              onCustom={() => setMode({ kind: 'x-form' })}
               onCancel={() => setMode({ kind: 'closed' })}
             />
           )}

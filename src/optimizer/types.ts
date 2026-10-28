@@ -30,6 +30,11 @@ export interface Player {
    * players take their team from the catalog instead.
    */
   team?: string | null
+  /**
+   * X Players only: the X Pool entry this player was added from. Its name,
+   * team, positions and stats then follow the pool; null for custom X Players.
+   */
+  xPoolId?: string | null
 }
 
 export interface LineupSlot {

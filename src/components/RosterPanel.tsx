@@ -154,9 +154,14 @@ function PlayerInspector({ player, players, onEdit, onDelete, onBack }: PlayerIn
       </div>
 
       <div className="flex gap-2 p-5">
-        <button onClick={() => onEdit(player)} className={`${buttonSecondary} flex-1`}>
-          Edit player
-        </button>
+        {player.xPoolId ? (
+          // Pool X Players take everything from the X Pool, so there's nothing to edit.
+          <p className="flex-1 self-center text-xs text-muted">From the X Pool, kept up to date automatically.</p>
+        ) : (
+          <button onClick={() => onEdit(player)} className={`${buttonSecondary} flex-1`}>
+            Edit player
+          </button>
+        )}
         <button onClick={() => onDelete(player.id)} className={buttonDanger}>
           Delete
         </button>

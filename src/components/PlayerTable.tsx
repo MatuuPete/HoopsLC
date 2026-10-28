@@ -185,9 +185,12 @@ export function PlayerTable({ players, onEdit, onDelete, onSelect, selectedId, s
                   <td className={`${numCell} font-medium text-text`}>{power(p)}</td>
                   <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                     <span className="flex justify-end gap-0.5 opacity-60 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
-                      <IconButton label={`Edit ${p.name}`} onClick={() => onEdit(p)}>
-                        {pencilPath}
-                      </IconButton>
+                      {/* Pool X Players take everything from the X Pool, so there's nothing to edit. */}
+                      {!p.xPoolId && (
+                        <IconButton label={`Edit ${p.name}`} onClick={() => onEdit(p)}>
+                          {pencilPath}
+                        </IconButton>
+                      )}
                       <IconButton label={`Delete ${p.name}`} tone="danger" onClick={() => onDelete(p.id)}>
                         {trashPath}
                       </IconButton>

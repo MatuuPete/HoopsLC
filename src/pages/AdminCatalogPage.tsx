@@ -3,6 +3,8 @@ import { useCatalog } from '../data/useCatalog'
 import { parseCatalogImport } from '../catalog/parseCatalogImport'
 import { diffCatalogImport } from '../catalog/diffCatalogImport'
 import type { CatalogDiffEntry, CatalogImportRow } from '../catalog/types'
+import { useXPool } from '../data/useXPool'
+import { diffXPoolImport, parseXPoolImport, type XPoolDiffEntry } from '../catalog/xPool'
 
 function formatDiffField<T extends number | string>(oldValue: T | null | undefined, newValue: T): string {
   if (oldValue === undefined || oldValue === null || oldValue === newValue) return `${newValue}`
@@ -10,6 +12,15 @@ function formatDiffField<T extends number | string>(oldValue: T | null | undefin
 }
 
 export function AdminCatalogPage() {
+  return (
+    <div className="flex flex-col gap-10 p-6 max-w-2xl">
+      <CatalogImportSection />
+      <XPoolImportSection />
+    </div>
+  )
+}
+
+function CatalogImportSection() {
   const { catalog, loading, error, importBatch } = useCatalog()
   const [raw, setRaw] = useState('')
   const [diff, setDiff] = useState<CatalogDiffEntry[] | null>(null)
@@ -46,7 +57,7 @@ export function AdminCatalogPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4 p-6 max-w-2xl">
+    <section className="flex flex-col gap-4">
       <h1 className="text-sm uppercase tracking-widest text-muted">Catalog Admin</h1>
 
       {error && <p className="text-red-400 text-sm">{error}</p>}
@@ -98,6 +109,112 @@ export function AdminCatalogPage() {
           </button>
         </div>
       )}
-    </div>
+    </section>
+  )
+}
+
+/**
+ * X Pool import: the game's X Players with team, positions, tier and stats.
+ * Confirming also links owned X Players with the same name, for every user,
+ * and copies the pool values onto them.
+ */
+function XPoolImportSection() {
+  const { pool, loading, error, importBatch } = useXPool()
+  const [raw, setRaw] = useState('')
+  const [diff, setDiff] = useState<XPoolDiffEntry[] | null>(null)
+  const [parseError, setParseError] = useState<string | null>(null)
+  const [importing, setImporting] = useState(false)
+  const [importError, setImportError] = useState<string | null>(null)
+
+  function handlePreview() {
+    setParseError(null)
+    setDiff(null)
+    setImportError(null)
+    try {
+      setDiff(diffXPoolImport(parseXPoolImport(raw), pool))
+    } catch (err) {
+      setParseError(err instanceof Error ? err.message : 'Failed to parse batch')
+    }
+  }
+
+  async function handleConfirm() {
+    if (!diff) return
+    setImporting(true)
+    setImportError(null)
+    try {
+      await importBatch(diff.map((entry) => entry.row))
+      setDiff(null)
+      setRaw('')
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : 'Import failed')
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  return (
+    <section className="flex flex-col gap-4 border-t border-border pt-8">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-sm uppercase tracking-widest text-muted">X Pool</h2>
+        <p className="text-xs text-muted">
+          {pool.length} X Players. Each row needs name, team, positions, offense and defense (tier is optional,
+          "standard" or "legend"). Owned X Players with the same name are linked and kept in sync.
+        </p>
+      </div>
+
+      {error && <p className="text-red-400 text-sm">{error}</p>}
+      {loading && <p className="text-muted text-sm">Loading...</p>}
+
+      <label className="flex flex-col gap-1 text-xs uppercase tracking-widest text-muted">
+        X Pool JSON
+        <textarea
+          className="bg-bg border border-border px-2 py-1 text-text h-40 font-mono text-xs"
+          value={raw}
+          onChange={(e) => setRaw(e.target.value)}
+        />
+      </label>
+
+      {parseError && <p className="text-xs text-red-400">{parseError}</p>}
+
+      <button
+        onClick={handlePreview}
+        disabled={loading || !!error}
+        className="border border-border px-4 py-2 uppercase tracking-widest text-xs w-fit disabled:opacity-50"
+      >
+        Preview
+      </button>
+
+      {diff && (
+        <div className="border border-border bg-panel p-4 flex flex-col gap-2">
+          <p className="text-xs text-muted">
+            {diff.filter((e) => e.status === 'new').length} new · {diff.filter((e) => e.status === 'changed').length}{' '}
+            changed · {diff.filter((e) => e.status === 'unchanged').length} unchanged
+          </p>
+          {diff.map((entry, index) => (
+            <div key={index} className="flex justify-between gap-3 text-sm">
+              <span className={entry.status === 'unchanged' ? 'text-muted' : 'text-text'}>
+                {entry.row.name} {entry.status === 'new' && '(new)'}
+              </span>
+              <span className="text-muted text-xs font-mono">
+                {formatDiffField(entry.existing?.team, entry.row.team)} · {entry.row.positions.join('/')} · Off{' '}
+                {formatDiffField(entry.existing?.offense, entry.row.offense)}, Def{' '}
+                {formatDiffField(entry.existing?.defense, entry.row.defense)}
+                {entry.row.tier === 'legend' && ' · LX'}
+              </span>
+            </div>
+          ))}
+
+          {importError && <p className="text-xs text-red-400">{importError}</p>}
+
+          <button
+            onClick={handleConfirm}
+            disabled={importing}
+            className="bg-text text-bg px-4 py-2 uppercase tracking-widest text-xs font-bold w-fit disabled:opacity-50"
+          >
+            {importing ? 'Importing…' : 'Confirm Import'}
+          </button>
+        </div>
+      )}
+    </section>
   )
 }
