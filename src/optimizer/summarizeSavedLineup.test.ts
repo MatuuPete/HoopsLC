@@ -31,7 +31,7 @@ describe('summarizeSavedLineup', () => {
     })
   })
 
-  it('adds bench salaries to the base total only, since they share the cap', () => {
+  it('adds the bench to base salary, offense and defense, but not TPower by salary', () => {
     const slots = [slot({ currentSalary: 999, baseSalary: 999, offense: 200, defense: 250 })]
     const bench = [
       { playerId: 'b', name: 'Bench', positions: ['C' as const], currentSalary: 1500, baseSalary: 1200, offense: 90, defense: 80 },
@@ -40,8 +40,8 @@ describe('summarizeSavedLineup', () => {
     expect(summarizeSavedLineup(slots, bench)).toEqual({
       totalPowerBySal: 999,
       totalBaseSalary: 2199,
-      totalOffense: 200,
-      totalDefense: 250,
+      totalOffense: 290,
+      totalDefense: 330,
     })
   })
 

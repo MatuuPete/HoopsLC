@@ -205,8 +205,13 @@ function LineupCard({
     .map((player) => toBenchView(player, tags))
     .sort((a, b) => b.offense + b.defense - (a.offense + a.defense))
   const hasBench = benchViews.length > 0
-  const totalOffense = views.reduce((sum, v) => sum + v.offense, 0)
-  const totalDefense = views.reduce((sum, v) => sum + v.defense, 0)
+  // Offense, defense and TPower by stats are team totals: starters plus bench.
+  const starterOffense = views.reduce((sum, v) => sum + v.offense, 0)
+  const starterDefense = views.reduce((sum, v) => sum + v.defense, 0)
+  const benchOffense = benchViews.reduce((sum, b) => sum + b.offense, 0)
+  const benchDefense = benchViews.reduce((sum, b) => sum + b.defense, 0)
+  const split = (starters: number, benchTotal: number): [number, number] | undefined =>
+    hasBench ? [starters, benchTotal] : undefined
   return (
     <section className="rounded-xl border border-border bg-panel">
       <header className="flex items-center justify-between gap-3 px-5 pt-5">
@@ -266,13 +271,18 @@ function LineupCard({
       )}
 
       <div className="grid grid-cols-2 gap-x-4 gap-y-5 border-t border-border px-5 py-5 sm:grid-cols-4">
-        <Stat label="Offense" value={totalOffense} />
-        <Stat label="Defense" value={totalDefense} />
+        <Stat label="Offense" value={starterOffense + benchOffense} split={split(starterOffense, benchOffense)} />
+        <Stat label="Defense" value={starterDefense + benchDefense} split={split(starterDefense, benchDefense)} />
         <Stat label="TPower · salary" value={sumCurrentSalary(slots)} />
-        <Stat label="TPower · stats" value={totalOffense + totalDefense} />
+        <Stat
+          label="TPower · stats"
+          value={starterOffense + starterDefense + benchOffense + benchDefense}
+          split={split(starterOffense + starterDefense, benchOffense + benchDefense)}
+        />
       </div>
       <p className="border-t border-border px-5 py-3 text-[11px] text-muted">
-        {hasBench && 'Totals are for the starting five; bench salaries still count against the cap. '}
+        {hasBench &&
+          'Offense, defense and TPower · stats are team totals (starters + bench); TPower · salary is the starting five. '}
         Offense and defense include award{big3s.length > 0 || superBig3.length > 0 ? ' and Big 3' : ''} bonuses. TPower totals exclude kits. Salaries shown are
         what you own each player at.
       </p>

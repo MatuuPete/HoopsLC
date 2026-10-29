@@ -329,12 +329,20 @@ export function CapStack({ slots, bench = [], cap }: { slots: SlotView[]; bench?
   )
 }
 
-/** A labelled number in the totals grid under a lineup. */
-export function Stat({ label, value }: { label: string; value: number }) {
+/**
+ * A labelled number in the totals grid under a lineup. `split` shows how a
+ * team total breaks down, e.g. starters + bench.
+ */
+export function Stat({ label, value, split }: { label: string; value: number; split?: [number, number] }) {
   return (
     <div className="flex flex-col gap-1">
       <span className="text-xs text-muted">{label}</span>
       <span className="font-mono text-lg tabular-nums leading-none text-text">{value}</span>
+      {split && (
+        <span className="font-mono text-[11px] tabular-nums text-muted" title="Starters + bench">
+          {split[0]} <span className="text-border">+</span> {split[1]}
+        </span>
+      )}
     </div>
   )
 }

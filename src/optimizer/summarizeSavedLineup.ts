@@ -8,8 +8,8 @@ export interface SavedLineupSummary {
 }
 
 /**
- * Totals for a saved lineup's starting five. The bench adds only to the base
- * salary total, because bench salaries count against the same cap.
+ * Totals for a saved lineup. Base salary, offense and defense cover the whole
+ * team, bench included; TPower by salary is the starting five only.
  */
 export function summarizeSavedLineup(
   slots: SavedLineupSlot[],
@@ -24,6 +24,13 @@ export function summarizeSavedLineup(
     }),
     { totalPowerBySal: 0, totalBaseSalary: 0, totalOffense: 0, totalDefense: 0 },
   )
-  const benchBaseSalary = bench.reduce((sum, player) => sum + player.baseSalary, 0)
-  return { ...starters, totalBaseSalary: starters.totalBaseSalary + benchBaseSalary }
+  return bench.reduce(
+    (summary, player) => ({
+      ...summary,
+      totalBaseSalary: summary.totalBaseSalary + player.baseSalary,
+      totalOffense: summary.totalOffense + player.offense,
+      totalDefense: summary.totalDefense + player.defense,
+    }),
+    starters,
+  )
 }
