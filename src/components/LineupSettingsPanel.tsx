@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { MAX_BENCH_SIZE, type ObjectiveMode, type Player } from '../optimizer/types'
-import { MAX_BIG3_COUNT, SUPER_BIG3_SIZE, type Big3Mode } from '../optimizer/big3'
+import { BIG3_SIZE, MAX_BIG3_COUNT, SUPER_BIG3_SIZE, starTeam, type Big3, type Big3Mode } from '../optimizer/big3'
 import type { PlayerRoleLists } from '../optimizer/playerRoles'
 import { Eyebrow, Switch, TierBadge } from './LineupParts'
 import { PlayerRolePicker } from './PlayerRolePicker'
@@ -28,6 +28,11 @@ export interface LineupSettingsPanelProps {
   /** A locked Super Big 3 (three owned, available players); empty means the builder picks. */
   superBig3PlayerIds: string[]
   onSuperBig3Change: (playerIds: string[]) => void
+  /** catalogPlayerId → team for every Team Big 3 star (see big3Stars). */
+  stars: Map<string, string>
+  /** Locked Team Big 3s; empty means the builder picks them. */
+  teamBig3Locks: Big3[]
+  onTeamBig3LocksChange: (locks: Big3[]) => void
   /** Whether any catalog player has a team yet; without teams there are no stars. */
   hasTeams: boolean
   /** Owned players not locked into a saved lineup. */
@@ -63,6 +68,9 @@ export function LineupSettingsPanel({
   onBig3Change,
   superBig3PlayerIds,
   onSuperBig3Change,
+  stars,
+  teamBig3Locks,
+  onTeamBig3LocksChange,
   hasTeams,
   players,
   allPlayers,
@@ -166,6 +174,9 @@ export function LineupSettingsPanel({
           allPlayers={allPlayers}
           lockedIds={superBig3PlayerIds}
           onLockedChange={onSuperBig3Change}
+          stars={stars}
+          teamLocks={teamBig3Locks}
+          onTeamLocksChange={onTeamBig3LocksChange}
         />
       </div>
 
@@ -283,6 +294,9 @@ function Big3Card({
   allPlayers,
   lockedIds,
   onLockedChange,
+  stars,
+  teamLocks,
+  onTeamLocksChange,
 }: {
   mode: Big3Mode
   count: number
@@ -292,6 +306,9 @@ function Big3Card({
   allPlayers: Player[]
   lockedIds: string[]
   onLockedChange: (playerIds: string[]) => void
+  stars: Map<string, string>
+  teamLocks: Big3[]
+  onTeamLocksChange: (locks: Big3[]) => void
 }) {
   const on = mode !== 'off'
   const teamCount = Math.max(1, count)
@@ -352,7 +369,16 @@ function Big3Card({
               ))}
             </div>
           </div>
-          {!hasTeams && (
+          {hasTeams ? (
+            <TeamBig3Locker
+              players={players}
+              allPlayers={allPlayers}
+              stars={stars}
+              locks={teamLocks}
+              maxCount={teamCount}
+              onChange={onTeamLocksChange}
+            />
+          ) : (
             <p className="text-[11px] leading-relaxed text-muted">
               No teams in the catalog yet. Add a <span className="font-mono text-text/80">team</span> to each
               player in the catalog import to find each team's stars.
@@ -364,6 +390,195 @@ function Big3Card({
       {mode === 'super' && (
         <SuperBig3Picker players={players} allPlayers={allPlayers} lockedIds={lockedIds} onChange={onLockedChange} />
       )}
+    </div>
+  )
+}
+
+/**
+ * Which Team Big 3s the builder fields: its own pick by default, or trios
+ * you lock in (one per team, up to the Big 3 count). A team's eligible
+ * players are its catalog stars and its X Players.
+ */
+function TeamBig3Locker({
+  players,
+  allPlayers,
+  stars,
+  locks,
+  maxCount,
+  onChange,
+}: {
+  players: Player[]
+  allPlayers: Player[]
+  stars: Map<string, string>
+  locks: Big3[]
+  maxCount: number
+  onChange: (locks: Big3[]) => void
+}) {
+  const [choosing, setChoosing] = useState(false)
+  const [team, setTeam] = useState('')
+  const [draft, setDraft] = useState<string[]>([])
+  const active = locks.slice(0, maxCount)
+  const nameOf = (id: string) => allPlayers.find((p) => p.id === id)?.name ?? 'Unknown player'
+
+  // Teams you can lock a Big 3 for: three or more eligible players you own, not locked already.
+  const byTeam = new Map<string, Player[]>()
+  for (const p of players) {
+    const t = starTeam(p, stars)
+    if (t) byTeam.set(t, [...(byTeam.get(t) ?? []), p])
+  }
+  const teams = [...byTeam.entries()]
+    .filter(([t, group]) => group.length >= BIG3_SIZE && !active.some((l) => l.team === t))
+    .map(([t]) => t)
+    .sort()
+
+  function start() {
+    setTeam(teams[0] ?? '')
+    setDraft([])
+    setChoosing(true)
+  }
+
+  if (choosing) {
+    const eligible = byTeam.get(team) ?? []
+    return (
+      <div className="flex flex-col gap-2 rounded-md border border-border bg-bg p-2">
+        <div className="flex items-center justify-between gap-2 px-1">
+          <label htmlFor="big3-team" className="text-xs text-text">
+            Team
+          </label>
+          <select
+            id="big3-team"
+            value={team}
+            onChange={(e) => {
+              setTeam(e.target.value)
+              setDraft([])
+            }}
+            className="rounded-md border border-border bg-panel px-2 py-1 font-mono text-xs text-text focus:border-star/60 focus:outline-none"
+          >
+            {teams.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+          <span className="ml-auto font-mono text-[11px] tabular-nums text-muted">
+            {draft.length} / {BIG3_SIZE}
+          </span>
+        </div>
+        {teams.length === 0 ? (
+          <p className="px-1 py-3 text-xs text-muted">
+            No team has three eligible players you own and haven't locked yet.
+          </p>
+        ) : (
+          <ul className="scrollbar-slim flex max-h-56 flex-col gap-0.5 overflow-y-auto">
+            {eligible.map((p) => {
+              const picked = draft.includes(p.id)
+              const full = !picked && draft.length >= BIG3_SIZE
+              return (
+                <li key={p.id}>
+                  <button
+                    type="button"
+                    role="checkbox"
+                    aria-checked={picked}
+                    disabled={full}
+                    onClick={() =>
+                      setDraft((current) => (picked ? current.filter((x) => x !== p.id) : [...current, p.id]))
+                    }
+                    className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+                      picked ? 'bg-star/10 text-text' : full ? 'text-muted/50' : 'text-text/85 hover:bg-white/[0.05]'
+                    }`}
+                  >
+                    <span
+                      aria-hidden
+                      className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border text-[9px] ${
+                        picked ? 'border-star bg-star text-ink' : 'border-border'
+                      }`}
+                    >
+                      {picked ? '✓' : ''}
+                    </span>
+                    <span className="truncate">{p.name}</span>
+                    {p.xTier && <TierBadge tier={p.xTier} />}
+                    <span className="ml-auto font-mono text-[11px] text-muted">{p.positions.join('/')}</span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+        <div className="flex justify-end gap-2 border-t border-border pt-2">
+          <button
+            type="button"
+            onClick={() => setChoosing(false)}
+            className="rounded-md px-2.5 py-1 text-xs text-muted hover:text-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={draft.length !== BIG3_SIZE}
+            onClick={() => {
+              onChange([...active, { team, playerIds: draft }])
+              setChoosing(false)
+            }}
+            className="rounded-md bg-star px-2.5 py-1 text-xs font-semibold text-ink transition-opacity disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            Lock this Big 3
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {active.length > 0 ? (
+        <ul aria-label="Locked Team Big 3s" className="flex flex-col gap-1.5">
+          {active.map((lock) => (
+            <li
+              key={lock.team}
+              className="flex items-center gap-2 rounded-md border border-star/40 bg-star/[0.08] px-2.5 py-1.5 text-xs text-text"
+            >
+              <span className="shrink-0 font-mono text-[10px] font-semibold text-star">★ {lock.team}</span>
+              <span className="min-w-0 flex-1 truncate">{lock.playerIds.map(nameOf).join(' · ')}</span>
+              <button
+                type="button"
+                onClick={() => onChange(active.filter((l) => l !== lock))}
+                aria-label={`Unlock the ${lock.team} Big 3`}
+                className="shrink-0 rounded px-1 text-muted hover:text-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-xs leading-relaxed text-muted">
+          <span className="text-text/85">Suggested:</span> the builder fields the Big 3 that makes your lineup
+          strongest.
+        </p>
+      )}
+      {active.length > 0 && active.length < maxCount && (
+        <p className="text-[11px] text-muted">The builder picks your other Big 3.</p>
+      )}
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+        {active.length < maxCount && (
+          <button
+            type="button"
+            onClick={start}
+            className="text-text underline decoration-border underline-offset-2 hover:decoration-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+          >
+            {active.length === 0 ? 'Choose a Big 3' : 'Choose another Big 3'}
+          </button>
+        )}
+        {active.length > 0 && (
+          <button
+            type="button"
+            onClick={() => onChange([])}
+            className="text-muted underline decoration-border underline-offset-2 hover:text-text hover:decoration-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+          >
+            Use suggestion
+          </button>
+        )}
+      </div>
     </div>
   )
 }

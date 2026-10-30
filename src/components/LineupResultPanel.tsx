@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { awardFor, effectiveDefense, effectiveOffense } from '../optimizer/awards'
-import { big3BonusMap, superBig3Bonus, type Big3, type Big3Bonus, type Big3Tag } from '../optimizer/big3'
+import { big3BonusMap, sameBig3, superBig3Bonus, type Big3, type Big3Bonus, type Big3Tag } from '../optimizer/big3'
 import { POSITIONS, type LineupResult, type LineupSlot, type Player } from '../optimizer/types'
 import {
   BenchRow,
@@ -62,6 +62,10 @@ interface LineupResultPanelProps {
   superBig3Locked?: boolean
   /** Locks the builder's Super Big 3 pick, shown as a button on the result. */
   onLockSuperBig3?: (playerIds: string[]) => Promise<void>
+  /** Team Big 3s the user has locked, so the result can mark them. */
+  lockedBig3?: Big3[]
+  /** Locks one of the builder's Team Big 3s, shown as a button on its line. */
+  onLockBig3?: (big3: Big3) => Promise<void>
 }
 
 function SaveLineupButton({ onSave }: { onSave: () => Promise<void> }) {
@@ -104,21 +108,81 @@ function Notice({ title, children }: { title: string; children: ReactNode }) {
 }
 
 /** The Team Big 3s a lineup fields, one line per team with its three players. */
-function Big3Strip({ big3s, players }: { big3s: Big3[]; players: Player[] }) {
+function Big3Strip({
+  big3s,
+  players,
+  locked,
+  onLock,
+}: {
+  big3s: Big3[]
+  players: Player[]
+  locked: Big3[]
+  onLock?: (big3: Big3) => Promise<void>
+}) {
   return (
     <ul aria-label="Team Big 3" className="flex flex-col gap-1.5 border-t border-border bg-star/[0.04] px-5 py-3">
       {big3s.map((big3) => (
-        <li key={big3.team} className="flex min-w-0 items-baseline gap-2 text-xs">
-          <span className="shrink-0 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-star">
-            ★ Big 3 · {big3.team}
-          </span>
-          <span className="truncate text-text/85">
-            {big3.playerIds.map((id) => players.find((p) => p.id === id)?.name ?? id).join(', ')}
-          </span>
-          <span className="ml-auto shrink-0 font-mono text-[11px] text-muted">+25%</span>
-        </li>
+        <Big3Line
+          key={big3.team}
+          big3={big3}
+          players={players}
+          locked={locked.some((l) => sameBig3(l, big3))}
+          onLock={onLock}
+        />
       ))}
     </ul>
+  )
+}
+
+/** One Team Big 3 in the result, with a button to lock it as the user's own. */
+function Big3Line({
+  big3,
+  players,
+  locked,
+  onLock,
+}: {
+  big3: Big3
+  players: Player[]
+  locked: boolean
+  onLock?: (big3: Big3) => Promise<void>
+}) {
+  const [status, setStatus] = useState<'idle' | 'locking' | 'locked'>(locked ? 'locked' : 'idle')
+  async function lock() {
+    if (!onLock) return
+    setStatus('locking')
+    try {
+      await onLock(big3)
+      setStatus('locked')
+    } catch {
+      setStatus('idle')
+    }
+  }
+  return (
+    <li className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5 text-xs">
+      <span className="shrink-0 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-star">
+        ★ Big 3 · {big3.team}
+      </span>
+      <span className="min-w-0 flex-1 truncate text-text/85">
+        {big3.playerIds.map((id) => players.find((p) => p.id === id)?.name ?? id).join(', ')}
+      </span>
+      <span className="shrink-0 font-mono text-[11px] text-muted">+25%</span>
+      {status === 'locked' ? (
+        <span className="rounded-sm border border-star/40 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-star">
+          Locked
+        </span>
+      ) : (
+        onLock && (
+          <button
+            type="button"
+            onClick={lock}
+            disabled={status === 'locking'}
+            className="rounded-md border border-star/50 px-2 py-1 text-[11px] font-medium text-star transition-colors hover:bg-star/10 disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+          >
+            {status === 'locking' ? 'Locking…' : 'Lock this Big 3'}
+          </button>
+        )
+      )}
+    </li>
   )
 }
 
@@ -182,6 +246,8 @@ function LineupCard({
   superBig3 = [],
   superBig3Locked = false,
   onLockSuperBig3,
+  lockedBig3 = [],
+  onLockBig3,
   cap,
   action,
 }: {
@@ -192,6 +258,8 @@ function LineupCard({
   superBig3?: string[]
   superBig3Locked?: boolean
   onLockSuperBig3?: (playerIds: string[]) => Promise<void>
+  lockedBig3?: Big3[]
+  onLockBig3?: (big3: Big3) => Promise<void>
   cap: number
   action?: ReactNode
 }) {
@@ -230,7 +298,7 @@ function LineupCard({
         <CapStack slots={views} bench={benchViews} cap={cap} />
       </div>
 
-      {big3s.length > 0 && <Big3Strip big3s={big3s} players={fielded} />}
+      {big3s.length > 0 && <Big3Strip big3s={big3s} players={fielded} locked={lockedBig3} onLock={onLockBig3} />}
       {superBig3.length > 0 && (
         <SuperBig3Strip
           playerIds={superBig3}
@@ -337,8 +405,20 @@ export function LineupResultPanel({
   onSave,
   superBig3Locked = false,
   onLockSuperBig3,
+  lockedBig3 = [],
+  onLockBig3,
 }: LineupResultPanelProps) {
   if (!result) return null
+
+  if (!result.success && result.reason === 'big3_locked_unavailable') {
+    const names = result.playerIds.map((id) => players.find((p) => p.id === id)?.name ?? id).join(', ')
+    return (
+      <Notice title="Your locked Big 3 can't be fielded">
+        {names} {result.playerIds.length === 1 ? 'is' : 'are'} set to Out, already in a saved lineup, or no longer
+        able to join that team's Big 3. Choose another Big 3, or switch back to the suggestion.
+      </Notice>
+    )
+  }
 
   if (!result.success && result.reason === 'super_big3_unavailable') {
     const names = result.playerIds.map((id) => players.find((p) => p.id === id)?.name ?? id).join(', ')
@@ -444,6 +524,8 @@ export function LineupResultPanel({
       superBig3={result.superBig3}
       superBig3Locked={superBig3Locked}
       onLockSuperBig3={onLockSuperBig3}
+      lockedBig3={lockedBig3}
+      onLockBig3={onLockBig3}
       cap={result.totalBaseSalary + result.remainingCap}
       action={onSave && <SaveLineupButton onSave={onSave} />}
     />

@@ -115,8 +115,10 @@ const STEPS: Step[] = [
                 the Players page. Three stars from one team in a lineup, starters or bench, form a Big 3,
                 and each of the three gets +25% of their offense and defense. Choose <Ui>1</Ui> Big 3
                 per lineup or <Ui>2</Ui> from different teams. X Players from the X Pool join their
-                team's Big 3 too. The builder only fields a Big 3 when it makes the lineup stronger, and
-                marks those players B3.
+                team's Big 3 too, Legend X included. The builder only fields a Big 3 when it makes the
+                lineup stronger, and marks those players B3. To use a Big 3 of your own, press{' '}
+                <Ui>Lock this Big 3</Ui> on the result, or <Ui>Choose a Big 3</Ui> and pick a team and
+                three of its players; locked Big 3s are always fielded, and the builder picks any other.
               </li>
               <li>
                 <Ui>Super Big 3</Ui>: any three starters, from any teams and including X Players, each

@@ -6,7 +6,14 @@ import { useCatalog } from '../data/useCatalog'
 import { findBestLineup } from '../optimizer/findBestLineup'
 import { lockedPlayerIds } from '../optimizer/lockedPlayerIds'
 import { awardFor, effectiveDefense, effectiveOffense, type Award } from '../optimizer/awards'
-import { SUPER_BIG3_SIZE, big3BonusMap, big3Stars, superBig3Bonus, type Big3Tag } from '../optimizer/big3'
+import {
+  SUPER_BIG3_SIZE,
+  big3BonusMap,
+  big3Stars,
+  superBig3Bonus,
+  type Big3,
+  type Big3Tag,
+} from '../optimizer/big3'
 import type { LineupResult, Player } from '../optimizer/types'
 import { LineupResultPanel, LineupResultPlaceholder } from '../components/LineupResultPanel'
 import { SavedLineupsPanel } from '../components/SavedLineupsPanel'
@@ -55,6 +62,8 @@ export function LineupBuilderPage() {
     updateBig3,
     superBig3PlayerIds,
     updateSuperBig3PlayerIds,
+    teamBig3Locks,
+    updateTeamBig3Locks,
     updatePlayerRoles,
     error: settingsError,
   } = useSettings()
@@ -90,6 +99,21 @@ export function LineupBuilderPage() {
     return owned.length === SUPER_BIG3_SIZE ? owned : []
   }, [superBig3PlayerIds, players])
 
+  // Locked Team Big 3s count while all their players are still owned, up to the Big 3 count.
+  const teamBig3Count = Math.max(1, big3Count)
+  const lockedTeamBig3 = useMemo(
+    () =>
+      teamBig3Locks
+        .filter((lock) => lock.playerIds.every((id) => players.some((p) => p.id === id)))
+        .slice(0, teamBig3Count),
+    [teamBig3Locks, players, teamBig3Count],
+  )
+
+  /** Locks a Big 3 from the result, replacing any lock for the same team and keeping within the count. */
+  async function handleLockBig3(big3: Big3) {
+    await updateTeamBig3Locks([...lockedTeamBig3.filter((l) => l.team !== big3.team), big3].slice(-teamBig3Count))
+  }
+
   useEffect(() => {
     setCapInput(salaryCap)
   }, [salaryCap])
@@ -106,7 +130,7 @@ export function LineupBuilderPage() {
         benchSize: activeBenchSize,
         preferredBenchPlayerIds,
         extraLegendX: legendEventEnabled,
-        big3: big3Mode === 'team' ? { maxCount: Math.max(1, big3Count), stars } : undefined,
+        big3: big3Mode === 'team' ? { maxCount: teamBig3Count, stars, locked: lockedTeamBig3 } : undefined,
         superBig3: big3Mode === 'super' ? { lockedIds: lockedSuperBig3 } : undefined,
       }),
     )
@@ -190,6 +214,9 @@ export function LineupBuilderPage() {
             onBig3Change={updateBig3}
             superBig3PlayerIds={lockedSuperBig3}
             onSuperBig3Change={updateSuperBig3PlayerIds}
+            stars={stars}
+            teamBig3Locks={lockedTeamBig3}
+            onTeamBig3LocksChange={updateTeamBig3Locks}
             hasTeams={stars.size > 0}
             players={availablePlayers}
             allPlayers={players}
@@ -210,6 +237,8 @@ export function LineupBuilderPage() {
               onSave={result.success ? handleSaveLineup : undefined}
               superBig3Locked={lockedSuperBig3.length > 0}
               onLockSuperBig3={updateSuperBig3PlayerIds}
+              lockedBig3={lockedTeamBig3}
+              onLockBig3={handleLockBig3}
             />
           ) : (
             <LineupResultPlaceholder benchSize={activeBenchSize} />

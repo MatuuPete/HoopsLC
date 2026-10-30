@@ -467,3 +467,7 @@ alter table settings add column if not exists big3_mode text not null default 'o
   check (big3_mode in ('off', 'team', 'super'));
 update settings set big3_mode = 'team' where big3_mode = 'off' and big3_count > 0;
 alter table settings add column if not exists super_big3_player_ids uuid[] not null default '{}';
+
+-- Locked Team Big 3s: [{ "team": "DEN", "playerIds": [uuid, uuid, uuid] }, ...]
+-- that the builder always fields (up to big3_count); empty lets it pick.
+alter table settings add column if not exists team_big3_locks jsonb not null default '[]';

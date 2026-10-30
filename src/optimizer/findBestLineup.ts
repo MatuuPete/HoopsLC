@@ -12,6 +12,7 @@ import {
   big3Bonus,
   big3BonusMap,
   candidateBig3Sets,
+  sameBig3,
   superBig3Bonus,
   type Big3,
   type Big3Bonus,
@@ -547,6 +548,13 @@ export function findBestLineup(
   }
   const requiredIds = [...new Set([...preferences.requiredPlayerIds, ...lockedSuper])]
 
+  // A locked Team Big 3 must be fielded, so all three must be available.
+  const lockedBig3 = (preferences.big3?.locked ?? []).slice(0, preferences.big3?.maxCount ?? 0)
+  const missingBig3 = lockedBig3.flatMap((b) => b.playerIds).filter((id) => !available.some((p) => p.id === id))
+  if (missingBig3.length > 0) {
+    return { success: false, reason: 'big3_locked_unavailable', playerIds: missingBig3 }
+  }
+
   const preferredForBoth = available
     .filter((p) => requiredIds.includes(p.id) && preferredBenchIds.includes(p.id))
     .map((p) => p.id)
@@ -617,9 +625,19 @@ export function findBestLineup(
   // the strongest run wins. Few teams have three owned stars, so this stays small.
   // The run without a Big 3 goes first, then the biggest bonuses, so a strong
   // lineup is found early and later runs can drop points that can't beat it.
-  const big3Sets: Big3[][] = preferences.big3
+  let big3Sets: Big3[][] = preferences.big3
     ? candidateBig3Sets(players, preferences.big3.stars, preferences.big3.maxCount)
     : [[]]
+  // Locked Big 3s keep only the sets that include them all. A lock that is no
+  // longer a possible Big 3 (a player stopped being a star) can't be fielded.
+  if (lockedBig3.length > 0) {
+    const trios = big3Sets.flat()
+    const invalid = lockedBig3.filter((locked) => !trios.some((t) => sameBig3(t, locked)))
+    if (invalid.length > 0) {
+      return { success: false, reason: 'big3_locked_unavailable', playerIds: invalid.flatMap((b) => b.playerIds) }
+    }
+    big3Sets = big3Sets.filter((set) => lockedBig3.every((locked) => set.some((t) => sameBig3(t, locked))))
+  }
   const bonusPower = (big3s: Big3[]) =>
     [...big3BonusMap(big3s, players).values()].reduce((sum, b) => sum + b.offense + b.defense, 0)
   big3Sets.sort((a, b) => a.length === 0 ? -1 : b.length === 0 ? 1 : bonusPower(b) - bonusPower(a))
@@ -694,9 +712,9 @@ export function findBestLineup(
   }
 
   if (!bestFeasible) {
-    // Nothing fits, so explain why using the first assignment, this time
-    // keeping over-cap points so the cheapest lineup can be shown.
-    const fullFives = fullFivesFor(seedAssignments[0], Infinity)
+    // Nothing fits, so explain why using the first assignment (and any locked
+    // Big 3s), this time keeping over-cap points so the cheapest lineup can be shown.
+    const fullFives = fullFivesFor(seedAssignments[0], Infinity, lockedBig3.length > 0 ? big3Sets[0] : [])
     const targetFrontier = fullFives[benchSize]
 
     // The largest bench a full five can be fielded with (-1: no full five at all).

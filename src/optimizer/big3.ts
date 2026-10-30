@@ -105,6 +105,11 @@ export function big3BonusMap(big3s: Big3[], players: Player[]): Map<string, Big3
   return bonuses
 }
 
+/** Whether two Big 3s are the same team and the same three players, in any order. */
+export function sameBig3(a: Big3, b: Big3): boolean {
+  return a.team === b.team && [...a.playerIds].sort().join() === [...b.playerIds].sort().join()
+}
+
 function combinations<T>(items: T[], size: number): T[][] {
   if (size === 0) return [[]]
   const results: T[][] = []

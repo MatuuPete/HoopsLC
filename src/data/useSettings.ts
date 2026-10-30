@@ -4,6 +4,7 @@ import {
   setBenchEnabled,
   setBig3,
   setSuperBig3PlayerIds,
+  setTeamBig3Locks,
   setBenchSize,
   setLegendEventEnabled,
   setObjectiveMode,
@@ -15,7 +16,7 @@ import {
 import { MAX_BENCH_SIZE, type ObjectiveMode } from '../optimizer/types'
 import type { PlayerRoleLists } from '../optimizer/playerRoles'
 import { useAuth } from '../auth/AuthContext'
-import type { Big3Mode } from '../optimizer/big3'
+import type { Big3, Big3Mode } from '../optimizer/big3'
 
 export function useSettings() {
   const { session } = useAuth()
@@ -32,6 +33,7 @@ export function useSettings() {
   const [big3Mode, setBig3ModeState] = useState<Big3Mode>('off')
   const [big3Count, setBig3CountState] = useState(0)
   const [superBig3PlayerIds, setSuperBig3PlayerIdsState] = useState<string[]>([])
+  const [teamBig3Locks, setTeamBig3LocksState] = useState<Big3[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const roleSaves = useRef<Promise<void>>(Promise.resolve())
@@ -55,6 +57,7 @@ export function useSettings() {
       setBig3ModeState(settings.big3Mode)
       setBig3CountState(settings.big3Count)
       setSuperBig3PlayerIdsState(settings.superBig3PlayerIds)
+      setTeamBig3LocksState(settings.teamBig3Locks)
       setError(null)
     } catch (err) {
       setError(`Couldn't load your settings: ${errorMessage(err)}`)
@@ -123,6 +126,11 @@ export function useSettings() {
     }
   }
 
+  async function updateTeamBig3Locks(locks: Big3[]) {
+    if (!session) return
+    if (await save(() => setTeamBig3Locks(session.user.id, locks))) setTeamBig3LocksState(locks)
+  }
+
   async function updateSuperBig3PlayerIds(ids: string[]) {
     if (!session) return
     if (await save(() => setSuperBig3PlayerIds(session.user.id, ids))) setSuperBig3PlayerIdsState(ids)
@@ -155,6 +163,7 @@ export function useSettings() {
     big3Mode,
     big3Count,
     superBig3PlayerIds,
+    teamBig3Locks,
     loading,
     error,
     updateSalaryCap,
@@ -166,6 +175,7 @@ export function useSettings() {
     updateLegendEventEnabled,
     updateBig3,
     updateSuperBig3PlayerIds,
+    updateTeamBig3Locks,
     updatePlayerRoles,
   }
 }

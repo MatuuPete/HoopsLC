@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabaseClient'
 import { MAX_BENCH_SIZE, type ObjectiveMode } from '../optimizer/types'
-import type { Big3Mode } from '../optimizer/big3'
+import type { Big3, Big3Mode } from '../optimizer/big3'
 import type { PlayerRoleLists } from '../optimizer/playerRoles'
 
 const DEFAULT_CAP = 3000
@@ -21,13 +21,15 @@ interface Settings {
   big3Count: number
   /** A locked Super Big 3; empty means the builder picks it. */
   superBig3PlayerIds: string[]
+  /** Locked Team Big 3s; empty means the builder picks them. */
+  teamBig3Locks: Big3[]
 }
 
 export async function getSettings(): Promise<Settings> {
   const { data, error } = await supabase
     .from('settings')
     .select(
-      'salary_cap, required_player_ids, unavailable_player_ids, objective_mode, offense_weight, saved_lineup_count, bench_enabled, bench_size, preferred_bench_player_ids, legend_event_enabled, big3_count, big3_mode, super_big3_player_ids',
+      'salary_cap, required_player_ids, unavailable_player_ids, objective_mode, offense_weight, saved_lineup_count, bench_enabled, bench_size, preferred_bench_player_ids, legend_event_enabled, big3_count, big3_mode, super_big3_player_ids, team_big3_locks',
     )
     .maybeSingle()
   if (error) throw error
@@ -45,6 +47,7 @@ export async function getSettings(): Promise<Settings> {
     big3Mode: (data?.big3_mode as Big3Mode) ?? 'off',
     big3Count: data?.big3_count ?? 0,
     superBig3PlayerIds: data?.super_big3_player_ids ?? [],
+    teamBig3Locks: (data?.team_big3_locks as Big3[] | null) ?? [],
   }
 }
 
@@ -92,6 +95,11 @@ export async function setBig3(userId: string, big3Mode: Big3Mode, big3Count: num
   const { error } = await supabase
     .from('settings')
     .upsert({ user_id: userId, big3_mode: big3Mode, big3_count: big3Count })
+  if (error) throw error
+}
+
+export async function setTeamBig3Locks(userId: string, locks: Big3[]): Promise<void> {
+  const { error } = await supabase.from('settings').upsert({ user_id: userId, team_big3_locks: locks })
   if (error) throw error
 }
 

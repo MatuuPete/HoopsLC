@@ -951,6 +951,79 @@ describe('findBestLineup with Team Big 3', () => {
     expect(result.big3s).toEqual([{ team: 'DEN', playerIds: expect.arrayContaining(['melo', 'jokic', 'murray']) }])
   })
 
+  describe('locked Big 3s', () => {
+    // Denver's trio is far stronger than Boston's; both fit together on a 3-man bench.
+    function twoTeams(): Player[] {
+      return [
+        makePlayer({ id: 'd1', positions: ['PG'], catalogPlayerId: 'd1', offense: 200, defense: 100 }),
+        makePlayer({ id: 'd2', positions: ['SG'], catalogPlayerId: 'd2', offense: 200, defense: 100 }),
+        makePlayer({ id: 'd3', positions: ['SF'], catalogPlayerId: 'd3', offense: 200, defense: 100 }),
+        makePlayer({ id: 'b1', positions: ['PF'], catalogPlayerId: 'b1', offense: 20, defense: 10 }),
+        makePlayer({ id: 'b2', positions: ['C'], catalogPlayerId: 'b2', offense: 20, defense: 10 }),
+        makePlayer({ id: 'b3', positions: ['C'], catalogPlayerId: 'b3', offense: 20, defense: 10 }),
+        makePlayer({ id: 'x', positions: ['C'], isXPlayer: true }),
+        makePlayer({ id: 'pf', positions: ['PF'], offense: 100, defense: 100 }),
+      ]
+    }
+    const stars = new Map([
+      ['d1', 'DEN'],
+      ['d2', 'DEN'],
+      ['d3', 'DEN'],
+      ['b1', 'BOS'],
+      ['b2', 'BOS'],
+      ['b3', 'BOS'],
+    ])
+    const boston = { team: 'BOS', playerIds: ['b3', 'b1', 'b2'] }
+
+    it('always fields a locked trio, even a weaker one', () => {
+      const result = findBestLineup(twoTeams(), 10000, {
+        ...DEFAULT_PREFERENCES,
+        benchSize: 3,
+        big3: { maxCount: 1, stars, locked: [boston] },
+      })
+      expect(result.success).toBe(true)
+      if (!result.success) return
+      expect(result.big3s).toHaveLength(1)
+      expect(result.big3s[0].team).toBe('BOS')
+      const fielded = [...result.slots.map((s) => s.player.id), ...result.bench.map((p) => p.id)]
+      expect(fielded).toEqual(expect.arrayContaining(['b1', 'b2', 'b3']))
+    })
+
+    it('still picks the best second Big 3 when only one is locked', () => {
+      const result = findBestLineup(twoTeams(), 10000, {
+        ...DEFAULT_PREFERENCES,
+        benchSize: 3,
+        big3: { maxCount: 2, stars, locked: [boston] },
+      })
+      expect(result.success).toBe(true)
+      if (!result.success) return
+      expect(result.big3s.map((b) => b.team).sort()).toEqual(['BOS', 'DEN'])
+    })
+
+    it('reports a locked player who is out', () => {
+      const result = findBestLineup(twoTeams(), 10000, {
+        ...DEFAULT_PREFERENCES,
+        unavailablePlayerIds: ['b2'],
+        benchSize: 3,
+        big3: { maxCount: 1, stars, locked: [boston] },
+      })
+      expect(result).toEqual({ success: false, reason: 'big3_locked_unavailable', playerIds: ['b2'] })
+    })
+
+    it('reports a locked trio that is no longer a Big 3', () => {
+      const noLongerStar = new Map(stars)
+      noLongerStar.delete('b3')
+      const result = findBestLineup(twoTeams(), 10000, {
+        ...DEFAULT_PREFERENCES,
+        benchSize: 3,
+        big3: { maxCount: 1, stars: noLongerStar, locked: [boston] },
+      })
+      expect(result.success).toBe(false)
+      if (result.success || result.reason !== 'big3_locked_unavailable') throw new Error('expected big3_locked_unavailable')
+      expect([...result.playerIds].sort()).toEqual(['b1', 'b2', 'b3'])
+    })
+  })
+
   it('fields two Big 3s from different teams when allowed', () => {
     const players = [
       makePlayer({ id: 'd1', positions: ['PG'], catalogPlayerId: 'd1' }),

@@ -120,9 +120,10 @@ export interface LineupPreferences {
    * Team Big 3: three of a team's stars in one lineup (starters or bench)
    * each get +25% of their base ratings. `stars` maps catalogPlayerId to team
    * (see big3Stars); `maxCount` is how many Big 3s may count (0-2). Absent
-   * means off.
+   * means off. `locked` trios are always fielded (up to maxCount of them);
+   * any Big 3 left over is the builder's pick.
    */
-  big3?: { maxCount: number; stars: Map<string, string> }
+  big3?: { maxCount: number; stars: Map<string, string>; locked?: Big3[] }
   /**
    * Super Big 3: three starters of any team each get +20% of their base
    * ratings. With `lockedIds` (three player ids) those players start and get
@@ -207,6 +208,16 @@ export interface LineupSuperBig3Unavailable {
   playerIds: string[]
 }
 
+/**
+ * A locked Team Big 3 can't be fielded: a player is set to Out, already in a
+ * saved lineup, or no longer able to join that team's Big 3.
+ */
+export interface LineupBig3LockedUnavailable {
+  success: false
+  reason: 'big3_locked_unavailable'
+  playerIds: string[]
+}
+
 export type LineupResult =
   | LineupSuccess
   | LineupMissingPosition
@@ -217,3 +228,4 @@ export type LineupResult =
   | LineupBenchTooSmall
   | LineupBenchPreferredOverflow
   | LineupSuperBig3Unavailable
+  | LineupBig3LockedUnavailable
