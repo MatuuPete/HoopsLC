@@ -420,16 +420,17 @@ function TeamBig3Locker({
   const active = locks.slice(0, maxCount)
   const nameOf = (id: string) => allPlayers.find((p) => p.id === id)?.name ?? 'Unknown player'
 
-  // Players you can lock into a Big 3, by team: teams with three or more you
-  // own that aren't locked already.
+  // Every player you own who can join a Team Big 3, by team (teams already
+  // locked left out). Teams with fewer than three are shown, greyed out, so
+  // it's clear who's missing.
   const byTeam = new Map<string, Player[]>()
   for (const p of players) {
     const t = starTeam(p, stars)
     if (t) byTeam.set(t, [...(byTeam.get(t) ?? []), p])
   }
   const teams = [...byTeam.entries()]
-    .filter(([t, group]) => group.length >= BIG3_SIZE && !active.some((l) => l.team === t))
-    .sort(([a], [b]) => a.localeCompare(b))
+    .filter(([t]) => !active.some((l) => l.team === t))
+    .sort(([a, ga], [b, gb]) => Number(gb.length >= BIG3_SIZE) - Number(ga.length >= BIG3_SIZE) || a.localeCompare(b))
 
   function start() {
     setDraft([])
@@ -459,21 +460,29 @@ function TeamBig3Locker({
         </div>
         <SearchInput value={search} onChange={setSearch} placeholder="Search name or team" label="Search players" />
         {teams.length === 0 ? (
-          <p className="px-1 py-3 text-xs text-muted">
-            No team has three eligible players you own and haven't locked yet.
+          <p className="px-1 py-3 text-xs leading-relaxed text-muted">
+            None of your players can join a Team Big 3 yet. Add catalog stars or X Players with a team on the
+            Players page.
           </p>
         ) : (
           <div className="scrollbar-slim flex max-h-64 flex-col gap-2 overflow-y-auto">
             {visible.map(([t, group]) => {
-              const otherTeam = !!draftTeam && draftTeam !== t
+              const owned = byTeam.get(t)?.length ?? 0
+              const short = owned < BIG3_SIZE
+              const otherTeam = short || (!!draftTeam && draftTeam !== t)
               return (
                 <section key={t} aria-label={`${t} players`}>
                   <h4
-                    className={`px-2 pb-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] ${
-                      otherTeam ? 'text-muted/40' : 'text-star'
+                    className={`flex items-baseline justify-between gap-2 px-2 pb-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] ${
+                      otherTeam ? 'text-muted/50' : 'text-star'
                     }`}
                   >
-                    ★ {t}
+                    <span>★ {t}</span>
+                    {short && (
+                      <span className="font-normal normal-case tracking-normal text-muted">
+                        you own {owned}, need {BIG3_SIZE}
+                      </span>
+                    )}
                   </h4>
                   <ul className="flex flex-col gap-0.5">
                     {group.map((p) => {
@@ -486,7 +495,13 @@ function TeamBig3Locker({
                             role="checkbox"
                             aria-checked={picked}
                             disabled={blocked}
-                            title={otherTeam ? `All three must be from ${draftTeam}` : undefined}
+                            title={
+                              short
+                                ? `You own ${owned} ${t} player${owned === 1 ? '' : 's'} who can join a Big 3; you need ${BIG3_SIZE}`
+                                : otherTeam
+                                  ? `All three must be from ${draftTeam}`
+                                  : undefined
+                            }
                             onClick={() =>
                               setDraft((current) => (picked ? current.filter((x) => x !== p.id) : [...current, p.id]))
                             }
@@ -517,7 +532,12 @@ function TeamBig3Locker({
                 </section>
               )
             })}
-            {visible.length === 0 && <p className="px-2 py-4 text-center text-xs text-muted">No players match.</p>}
+            {visible.length === 0 && (
+              <p className="px-2 py-4 text-center text-xs leading-relaxed text-muted">
+                No one on your roster matches "{search.trim()}". Only players you own who can join a Team Big 3
+                are listed: add them on the Players page, and check they aren't in a saved lineup.
+              </p>
+            )}
           </div>
         )}
         <div className="flex justify-end gap-2 border-t border-border pt-2">
