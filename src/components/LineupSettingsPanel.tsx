@@ -415,12 +415,13 @@ function TeamBig3Locker({
   onChange: (locks: Big3[]) => void
 }) {
   const [choosing, setChoosing] = useState(false)
-  const [team, setTeam] = useState('')
   const [draft, setDraft] = useState<string[]>([])
+  const [search, setSearch] = useState('')
   const active = locks.slice(0, maxCount)
   const nameOf = (id: string) => allPlayers.find((p) => p.id === id)?.name ?? 'Unknown player'
 
-  // Teams you can lock a Big 3 for: three or more eligible players you own, not locked already.
+  // Players you can lock into a Big 3, by team: teams with three or more you
+  // own that aren't locked already.
   const byTeam = new Map<string, Player[]>()
   for (const p of players) {
     const t = starTeam(p, stars)
@@ -428,81 +429,96 @@ function TeamBig3Locker({
   }
   const teams = [...byTeam.entries()]
     .filter(([t, group]) => group.length >= BIG3_SIZE && !active.some((l) => l.team === t))
-    .map(([t]) => t)
-    .sort()
+    .sort(([a], [b]) => a.localeCompare(b))
 
   function start() {
-    setTeam(teams[0] ?? '')
     setDraft([])
+    setSearch('')
     setChoosing(true)
   }
 
   if (choosing) {
-    const eligible = byTeam.get(team) ?? []
+    // The first pick sets the team; all three must share it.
+    const draftTeam = draft.length > 0 ? teams.find(([, group]) => group.some((p) => p.id === draft[0]))?.[0] : undefined
+    const query = search.trim().toLowerCase()
+    const visible = teams
+      .map(([t, group]) => [
+        t,
+        group.filter((p) => query === '' || p.name.toLowerCase().includes(query) || t.toLowerCase().includes(query)),
+      ] as const)
+      .filter(([, group]) => group.length > 0)
+
     return (
       <div className="flex flex-col gap-2 rounded-md border border-border bg-bg p-2">
         <div className="flex items-center justify-between gap-2 px-1">
-          <label htmlFor="big3-team" className="text-xs text-text">
-            Team
-          </label>
-          <select
-            id="big3-team"
-            value={team}
-            onChange={(e) => {
-              setTeam(e.target.value)
-              setDraft([])
-            }}
-            className="rounded-md border border-border bg-panel px-2 py-1 font-mono text-xs text-text focus:border-star/60 focus:outline-none"
-          >
-            {teams.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
-          <span className="ml-auto font-mono text-[11px] tabular-nums text-muted">
+          <span className="text-xs text-text">Pick 3 players from one team</span>
+          <span className="font-mono text-[11px] tabular-nums text-muted">
+            {draftTeam && <span className="text-star">{draftTeam} · </span>}
             {draft.length} / {BIG3_SIZE}
           </span>
         </div>
+        <SearchInput value={search} onChange={setSearch} placeholder="Search name or team" label="Search players" />
         {teams.length === 0 ? (
           <p className="px-1 py-3 text-xs text-muted">
             No team has three eligible players you own and haven't locked yet.
           </p>
         ) : (
-          <ul className="scrollbar-slim flex max-h-56 flex-col gap-0.5 overflow-y-auto">
-            {eligible.map((p) => {
-              const picked = draft.includes(p.id)
-              const full = !picked && draft.length >= BIG3_SIZE
+          <div className="scrollbar-slim flex max-h-64 flex-col gap-2 overflow-y-auto">
+            {visible.map(([t, group]) => {
+              const otherTeam = !!draftTeam && draftTeam !== t
               return (
-                <li key={p.id}>
-                  <button
-                    type="button"
-                    role="checkbox"
-                    aria-checked={picked}
-                    disabled={full}
-                    onClick={() =>
-                      setDraft((current) => (picked ? current.filter((x) => x !== p.id) : [...current, p.id]))
-                    }
-                    className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
-                      picked ? 'bg-star/10 text-text' : full ? 'text-muted/50' : 'text-text/85 hover:bg-white/[0.05]'
+                <section key={t} aria-label={`${t} players`}>
+                  <h4
+                    className={`px-2 pb-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] ${
+                      otherTeam ? 'text-muted/40' : 'text-star'
                     }`}
                   >
-                    <span
-                      aria-hidden
-                      className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border text-[9px] ${
-                        picked ? 'border-star bg-star text-ink' : 'border-border'
-                      }`}
-                    >
-                      {picked ? '✓' : ''}
-                    </span>
-                    <span className="truncate">{p.name}</span>
-                    {p.xTier && <TierBadge tier={p.xTier} />}
-                    <span className="ml-auto font-mono text-[11px] text-muted">{p.positions.join('/')}</span>
-                  </button>
-                </li>
+                    ★ {t}
+                  </h4>
+                  <ul className="flex flex-col gap-0.5">
+                    {group.map((p) => {
+                      const picked = draft.includes(p.id)
+                      const blocked = !picked && (otherTeam || draft.length >= BIG3_SIZE)
+                      return (
+                        <li key={p.id}>
+                          <button
+                            type="button"
+                            role="checkbox"
+                            aria-checked={picked}
+                            disabled={blocked}
+                            title={otherTeam ? `All three must be from ${draftTeam}` : undefined}
+                            onClick={() =>
+                              setDraft((current) => (picked ? current.filter((x) => x !== p.id) : [...current, p.id]))
+                            }
+                            className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+                              picked
+                                ? 'bg-star/10 text-text'
+                                : blocked
+                                  ? 'text-muted/40'
+                                  : 'text-text/85 hover:bg-white/[0.05]'
+                            }`}
+                          >
+                            <span
+                              aria-hidden
+                              className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border text-[9px] ${
+                                picked ? 'border-star bg-star text-ink' : 'border-border'
+                              }`}
+                            >
+                              {picked ? '✓' : ''}
+                            </span>
+                            <span className="truncate">{p.name}</span>
+                            {p.xTier && <TierBadge tier={p.xTier} />}
+                            <span className="ml-auto font-mono text-[11px] text-muted">{p.positions.join('/')}</span>
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </section>
               )
             })}
-          </ul>
+            {visible.length === 0 && <p className="px-2 py-4 text-center text-xs text-muted">No players match.</p>}
+          </div>
         )}
         <div className="flex justify-end gap-2 border-t border-border pt-2">
           <button
@@ -514,9 +530,10 @@ function TeamBig3Locker({
           </button>
           <button
             type="button"
-            disabled={draft.length !== BIG3_SIZE}
+            disabled={draft.length !== BIG3_SIZE || !draftTeam}
             onClick={() => {
-              onChange([...active, { team, playerIds: draft }])
+              if (!draftTeam) return
+              onChange([...active, { team: draftTeam, playerIds: draft }])
               setChoosing(false)
             }}
             className="rounded-md bg-star px-2.5 py-1 text-xs font-semibold text-ink transition-opacity disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
