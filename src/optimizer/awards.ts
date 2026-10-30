@@ -24,7 +24,7 @@ const AWARD_TYPES = {
  * awards change. Awards with no holder yet are simply left out.
  */
 const AWARDS: Record<string, Award> = {
-  'ty jerome': { ...AWARD_TYPES.playerOfTheWeek, offense: 5, defense: 0 },
+  'tyrese maxey': { ...AWARD_TYPES.playerOfTheWeek, offense: 5, defense: 0 },
   // Rookie of the Week: not awarded yet
   // Player of the Month: not awarded yet
   // Rookie of the Month: not awarded yet
