@@ -1188,7 +1188,7 @@ describe('findBestLineup with Team Big 3', () => {
 })
 
 describe('findBestLineup with Super Big 3', () => {
-  const superBonus = (p: Player) => Math.round(p.offense * 0.2) + Math.round(p.defense * 0.2)
+  const superBonus = (p: Player) => Math.round(p.offense * 0.22) + Math.round(p.defense * 0.22)
 
   it('boosts the three starters that make the lineup strongest', () => {
     const players = [
@@ -1201,14 +1201,14 @@ describe('findBestLineup with Super Big 3', () => {
     const result = findBestLineup(players, 10000, { ...DEFAULT_PREFERENCES, superBig3: { lockedIds: [] } })
     expect(result.success).toBe(true)
     if (!result.success) return
-    // The three strongest starters, X Player included, get the 20%.
+    // The three strongest starters, X Player included, get the 22%.
     expect([...result.superBig3].sort()).toEqual(['pf', 'pg', 'sg'])
     expect(result.big3s).toEqual([])
   })
 
   it('picks a lineup that only wins once its stars are boosted', () => {
     // At PG, the star loses to pg-plain on raw power (300 < 310) but wins
-    // with the 20% (300 + 60 > 310), so the Super Big 3 changes the lineup.
+    // with the 22% (300 + 66 > 310), so the Super Big 3 changes the lineup.
     const players = [
       makePlayer({ id: 'pg-star', positions: ['PG'], offense: 200, defense: 100 }),
       makePlayer({ id: 'pg-plain', positions: ['PG'], offense: 210, defense: 100 }),
@@ -1221,7 +1221,7 @@ describe('findBestLineup with Super Big 3', () => {
     expect(result.success).toBe(true)
     if (!result.success) return
     expect(result.slots.find((s) => s.position === 'PG')?.player.id).toBe('pg-plain')
-    // Boosting pg-plain (+62) beats any other pick, so it's in the trio.
+    // Boosting pg-plain (+68) beats any other pick, so it's in the trio.
     expect(result.superBig3).toContain('pg-plain')
   })
 

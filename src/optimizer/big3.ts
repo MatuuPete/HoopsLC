@@ -10,7 +10,7 @@ export const BIG3_SIZE = 3
 export const BIG3_BONUS_RATE = 0.25
 
 /** A Super Big 3 starter gets this share of their base offense and defense on top. */
-export const SUPER_BIG3_BONUS_RATE = 0.2
+export const SUPER_BIG3_BONUS_RATE = 0.22
 
 /** How many starters a Super Big 3 boosts. */
 export const SUPER_BIG3_SIZE = 3
@@ -85,7 +85,7 @@ export function big3Bonus(player: Pick<Player, 'offense' | 'defense'>): Big3Bonu
   }
 }
 
-/** The Super Big 3 bonus on a player's base ratings, e.g. 249/119 → +50/+24. */
+/** The Super Big 3 bonus on a player's base ratings, e.g. 249/119 → +55/+26. */
 export function superBig3Bonus(player: Pick<Player, 'offense' | 'defense'>): Big3Bonus {
   return {
     offense: Math.round(player.offense * SUPER_BIG3_BONUS_RATE),

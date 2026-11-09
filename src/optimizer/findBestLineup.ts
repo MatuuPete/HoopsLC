@@ -117,7 +117,7 @@ function makeScoring(players: Player[], preferences: LineupPreferences): Scoring
   const base = { preferences, benchSize, extraLegendX, bonuses, boostLimit }
   if (benchSize === 0) return { ...base, starterScale: 1 }
   // Sized as if every player had the largest bonus (Team Big 3's 25% tops the
-  // Super Big 3's 20%), so the scale holds in every run.
+  // Super Big 3's 22%), so the scale holds in every run.
   const anyBonus = !!preferences.big3?.maxCount || !!preferences.superBig3
   const withBonus = (p: Player) => (anyBonus ? big3Bonus(p) : NO_BONUS)
   const maxValue = players.reduce((max, p) => Math.max(max, computeValue(p, preferences, withBonus(p))), 0)

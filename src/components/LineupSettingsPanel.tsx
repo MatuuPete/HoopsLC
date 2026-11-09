@@ -283,7 +283,7 @@ const BIG3_MODES: { mode: Big3Mode; label: string }[] = [
 
 /**
  * The Big 3 setting: off, Team Big 3 (three stars of one team, +25%), or
- * Super Big 3 (any three starters, +20%). Only one applies to a lineup.
+ * Super Big 3 (any three starters, +22%). Only one applies to a lineup.
  */
 function Big3Card({
   mode,
@@ -332,7 +332,7 @@ function Big3Card({
               ? teamCount === 1
                 ? 'Three stars of one team: +25% each'
                 : 'Up to two teams, three stars each: +25%'
-              : 'Any three starters you choose: +20% each'}
+              : 'Any three starters you choose: +22% each'}
         </span>
       </div>
       <div

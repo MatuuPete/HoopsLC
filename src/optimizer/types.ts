@@ -125,7 +125,7 @@ export interface LineupPreferences {
    */
   big3?: { maxCount: number; stars: Map<string, string>; locked?: Big3[] }
   /**
-   * Super Big 3: three starters of any team each get +20% of their base
+   * Super Big 3: three starters of any team each get +22% of their base
    * ratings. With `lockedIds` (three player ids) those players start and get
    * it; with none, the builder picks the best three. Absent means off. Never
    * set together with `big3`.

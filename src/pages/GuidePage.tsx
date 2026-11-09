@@ -122,7 +122,7 @@ const STEPS: Step[] = [
               </li>
               <li>
                 <Ui>Super Big 3</Ui>: any three starters, from any teams and including X Players, each
-                get +20%. By default the builder picks the three that make your lineup strongest under
+                get +22%. By default the builder picks the three that make your lineup strongest under
                 the cap. Press <Ui>Lock these 3</Ui> on the result to keep them, or{' '}
                 <Ui>Choose 3 players</Ui> to pick your own; locked players always start. Super Big 3
                 players are marked SB3.

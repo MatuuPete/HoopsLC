@@ -217,7 +217,7 @@ function SuperBig3Strip({
       <span className="min-w-0 flex-1 truncate text-text/85">
         {playerIds.map((id) => players.find((p) => p.id === id)?.name ?? id).join(', ')}
       </span>
-      <span className="font-mono text-[11px] text-muted">+20%</span>
+      <span className="font-mono text-[11px] text-muted">+22%</span>
       {status === 'locked' ? (
         <span className="rounded-sm border border-star/40 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-star">
           Locked
