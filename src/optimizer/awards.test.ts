@@ -20,9 +20,9 @@ function makePlayer(name: string, overrides: Partial<Player> = {}): Player {
 
 describe('awards', () => {
   it('looks up an award by player name, ignoring case and surrounding spaces', () => {
-    expect(awardFor('Jayson Tatum')).toMatchObject({ award: 'Player of the Week', offense: 5, defense: 0 })
-    expect(awardFor('  jayson tatum ')).toMatchObject({ award: 'Player of the Week', offense: 5, defense: 0 })
-    expect(awardFor('Victor Wembanyama')).toMatchObject({ award: 'Player of the Week', offense: 5, defense: 0 })
+    expect(awardFor('Jalen Brunson')).toMatchObject({ award: 'Player of the Week', offense: 5, defense: 0 })
+    expect(awardFor('  jalen brunson ')).toMatchObject({ award: 'Player of the Week', offense: 5, defense: 0 })
+    expect(awardFor('Luka Doncic')).toMatchObject({ award: 'Player of the Week', offense: 5, defense: 0 })
   })
 
   it('returns null for players without an award', () => {
@@ -30,9 +30,9 @@ describe('awards', () => {
   })
 
   it('adds the award bonus to offense and defense', () => {
-    const tatum = makePlayer('Jayson Tatum', { offense: 180, defense: 120 })
-    expect(effectiveOffense(tatum)).toBe(185)
-    expect(effectiveDefense(tatum)).toBe(120)
+    const brunson = makePlayer('Jalen Brunson', { offense: 180, defense: 120 })
+    expect(effectiveOffense(brunson)).toBe(185)
+    expect(effectiveDefense(brunson)).toBe(120)
   })
 
   it('leaves players without an award unchanged', () => {

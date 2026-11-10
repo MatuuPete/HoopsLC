@@ -32,9 +32,9 @@ describe('sortPlayers', () => {
   })
 
   it('counts award bonuses toward power', () => {
-    const tatum = makePlayer({ id: 'tatum', name: 'Jayson Tatum', offense: 50, defense: 50 })
+    const brunson = makePlayer({ id: 'brunson', name: 'Jalen Brunson', offense: 50, defense: 50 })
     const twin = makePlayer({ id: 'twin', offense: 51, defense: 51 })
-    expect(ids(sortPlayers([twin, tatum], { key: 'power', dir: 'desc' }))).toEqual(['tatum', 'twin'])
+    expect(ids(sortPlayers([twin, brunson], { key: 'power', dir: 'desc' }))).toEqual(['brunson', 'twin'])
   })
 
   it('sorts by power per salary', () => {

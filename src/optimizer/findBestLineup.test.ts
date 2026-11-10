@@ -38,7 +38,7 @@ describe('findBestLineup', () => {
       makePlayer({ id: 'sg-x', positions: ['SG'], isXPlayer: true }),
       makePlayer({ id: 'sf-rich', positions: ['SF'], currentSalary: 900, offense: 100, defense: 100 }),
       // 100 + 96 raw, plus the Player of the Week bonus (+5 OFF) = 201.
-      makePlayer({ id: 'sf-potw', name: 'Jayson Tatum', positions: ['SF'], currentSalary: 200, offense: 100, defense: 96 }),
+      makePlayer({ id: 'sf-potw', name: 'Jalen Brunson', positions: ['SF'], currentSalary: 200, offense: 100, defense: 96 }),
       makePlayer({ id: 'pf', positions: ['PF'] }),
       makePlayer({ id: 'c', positions: ['C'] }),
     ]
@@ -54,7 +54,7 @@ describe('findBestLineup', () => {
     // Two PGs with identical raw stats and salary; only one has an award (Player of the Week, +5 OFF).
     const players: Player[] = [
       makePlayer({ id: 'a-plain', name: 'Plain Guard', positions: ['PG'] }),
-      makePlayer({ id: 'z-potw', name: 'Jayson Tatum', positions: ['PG'] }),
+      makePlayer({ id: 'z-potw', name: 'Jalen Brunson', positions: ['PG'] }),
       makePlayer({ id: 'sg', positions: ['SG'], isXPlayer: true }),
       makePlayer({ id: 'sf', positions: ['SF'] }),
       makePlayer({ id: 'pf', positions: ['PF'] }),
